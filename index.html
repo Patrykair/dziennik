@@ -263,6 +263,15 @@ if ('serviceWorker' in navigator) {
       <button id="reset-types-btn" class="btn btn-danger-sm" style="margin-top:8px;width:100%">↺ Przywróć domyślne typy</button>
     </div>
   </div>
+
+  <div class="section-label">Backup danych</div>
+  <div class="card">
+    <div class="card-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Automatyczny backup wysyłany co poniedziałek na email. Możesz też wywołać go ręcznie.</p>
+      <button id="backup-now-btn" class="btn btn-secondary" style="width:100%">📦 Wyślij backup teraz</button>
+      <div id="backup-status" style="font-size:12px;color:var(--text2);margin-top:8px;text-align:center"></div>
+    </div>
+  </div>
 </div>
 
 <!-- PAGE: GODZINY -->
@@ -1167,7 +1176,27 @@ function shiftDay(dir) {
   updateHeader();
   refresh();
 }
-window.shiftDay = shiftDay;
+function sendBackup() {
+  const btn = document.getElementById('backup-now-btn');
+  const status = document.getElementById('backup-status');
+  btn.textContent = '🔄 Wysyłanie...';
+  btn.disabled = true;
+  fetch(SYNC_URL + '?action=backup')
+    .then(r => r.text())
+    .then(() => {
+      status.textContent = '✓ Backup wysłany na email!';
+      status.style.color = '#0f6e56';
+      btn.textContent = '📦 Wyślij backup teraz';
+      btn.disabled = false;
+    })
+    .catch(() => {
+      status.textContent = '⚠️ Błąd — sprawdź połączenie';
+      status.style.color = '#c0392b';
+      btn.textContent = '📦 Wyślij backup teraz';
+      btn.disabled = false;
+    });
+}
+window.sendBackup = sendBackup;
 
 document.getElementById('sync-btn').addEventListener('click', syncFromSheets);
 document.getElementById('week-prev').addEventListener('click', () => shiftWeek(-1));
@@ -1181,7 +1210,7 @@ document.getElementById('open-date-modal').addEventListener('click', openDateMod
 document.getElementById('confirm-date').addEventListener('click', closeDateModal);
 document.getElementById('add-task-btn').addEventListener('click', addTask);
 document.getElementById('add-type-btn').addEventListener('click', addType);
-document.getElementById('reset-types-btn').addEventListener('click', resetTypes);
+document.getElementById('backup-now-btn').addEventListener('click', sendBackup);
 document.getElementById('reclean-btn').addEventListener('click', toggleReClean);
 
 }); // end DOMContentLoaded
