@@ -190,6 +190,18 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay modal-hidden" id="confirm-modal">
+  <div class="modal">
+    <h3>Usuń zadanie</h3>
+    <p id="confirm-text" style="font-size:14px;color:var(--text2);margin-bottom:16px"></p>
+    <div style="display:flex;gap:8px">
+      <button id="confirm-cancel-btn" class="btn btn-secondary" style="flex:1">Anuluj</button>
+      <button id="confirm-ok-btn" class="btn" style="flex:1;background:#c0392b;color:#fff">Usuń</button>
+    </div>
+  </div>
+</div>
+
 <!-- DATE MODAL -->
 <div class="modal-overlay modal-hidden" id="date-modal">
   <div class="modal">
@@ -626,7 +638,29 @@ function addTask() {
   showToast('✓ Zadanie dodane');
 }
 
+let pendingRemove = null;
+
 function removeTask(date, id, groupId) {
+  // Find task name for confirmation message
+  const tasks = st.tasks[date]||[];
+  let taskName = '';
+  if (groupId) {
+    const t = tasks.find(t=>String(t.groupId)===String(groupId));
+    taskName = t ? `${t.typeName} (${t.person}${t.groupWith&&t.groupWith.length?' + '+t.groupWith.map(p=>p.split(' ')[0]).join(', '):''})`  : 'zadanie grupowe';
+  } else {
+    const t = tasks.find(t=>t.id===id);
+    taskName = t ? `${t.typeName} (${t.person})` : 'zadanie';
+  }
+  pendingRemove = {date, id, groupId};
+  document.getElementById('confirm-text').textContent = `Czy na pewno chcesz usunąć: ${taskName}?`;
+  document.getElementById('confirm-modal').classList.remove('modal-hidden');
+}
+
+function doRemoveTask() {
+  if (!pendingRemove) return;
+  const {date, id, groupId} = pendingRemove;
+  pendingRemove = null;
+  document.getElementById('confirm-modal').classList.add('modal-hidden');
   const snap = {tasks: JSON.parse(JSON.stringify(st.tasks)), logs: JSON.parse(JSON.stringify(st.logs))};
   let removed = [];
   if (groupId) {
@@ -638,7 +672,9 @@ function removeTask(date, id, groupId) {
   }
   const desc = removed.map(t=>`${t.typeName} (${t.person})`).join(', ');
   logChange('Usunięto zadanie', desc || 'zadanie', snap);
-  saveState(); renderAssign();
+  saveState();
+  renderAssign();
+  if (currentPage === 'summary') renderSummary();
 }
 
 function addType() {
@@ -1148,6 +1184,7 @@ document.getElementById('global-date-input').addEventListener('change', function
 // Expose functions needed by dynamic HTML onclick attributes
 window.removeTask = removeTask;
 window.renderSummary = renderSummary;
+window.doRemoveTask = doRemoveTask;
 window.addTask = addTask;
 window.addType = addType;
 function resetTypes() {
@@ -1199,6 +1236,17 @@ function sendBackup() {
 window.sendBackup = sendBackup;
 
 document.getElementById('sync-btn').addEventListener('click', syncFromSheets);
+document.getElementById('confirm-ok-btn').addEventListener('click', doRemoveTask);
+document.getElementById('confirm-cancel-btn').addEventListener('click', () => {
+  pendingRemove = null;
+  document.getElementById('confirm-modal').classList.add('modal-hidden');
+});
+document.getElementById('confirm-modal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    pendingRemove = null;
+    this.classList.add('modal-hidden');
+  }
+});
 document.getElementById('week-prev').addEventListener('click', () => shiftWeek(-1));
 document.getElementById('week-next').addEventListener('click', () => shiftWeek(1));
 
