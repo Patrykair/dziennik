@@ -217,6 +217,13 @@ if ('serviceWorker' in navigator) {
   <div class="section-label">Dodaj zadanie</div>
   <div class="card">
     <div class="card-body">
+
+      <!-- VOICE INPUT -->
+      <button id="voice-btn" class="btn btn-secondary" style="width:100%;margin-bottom:14px;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px">
+        🎤 Dodaj głosowo
+      </button>
+      <div id="voice-status" style="display:none;font-size:12px;color:var(--text2);text-align:center;margin-bottom:10px;padding:8px;background:var(--bg);border-radius:var(--radius-sm)"></div>
+
       <div class="form-group">
         <label class="form-label">Pracownik</label>
         <select id="a-person" onchange="renderCollabList();previewHours()"></select>
@@ -1101,6 +1108,238 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2000);
 }
 
+function startVoice() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    showToast('⚠️ Twoja przeglądarka nie obsługuje głosu');
+    return;
+  }
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'pl-PL';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  const btn = document.getElementById('voice-btn');
+  const status = document.getElementById('voice-status');
+  btn.textContent = '🔴 Słucham... (kliknij aby zatrzymać)';
+  btn.style.background = '#fdecea';
+  btn.style.borderColor = '#c0392b';
+  status.style.display = 'block';
+  status.textContent = 'Mów np: "Natalia Ensuite Bedroom Flat 12"';
+
+  recognition.onresult = (e) => {
+    const rawText = e.results[0][0].transcript.toLowerCase();
+    // Normalize Polish characters
+    const text = rawText
+      .replace(/ą/g,'a').replace(/ć/g,'c').replace(/ę/g,'e')
+      .replace(/ł/g,'l').replace(/ń/g,'n').replace(/ó/g,'o')
+      .replace(/ś/g,'s').replace(/ź/g,'z').replace(/ż/g,'z');
+    status.textContent = '🎤 Usłyszałem: "' + rawText + '"';
+    parseVoiceCommand(text);
+  };
+
+  recognition.onerror = (e) => {
+    console.log('Voice error:', e.error);
+    if (e.error === 'no-speech') {
+      status.textContent = '⚠️ Nie usłyszałem nic — spróbuj jeszcze raz';
+    } else if (e.error === 'not-allowed') {
+      status.textContent = '⚠️ Brak dostępu do mikrofonu — sprawdź ustawienia';
+    } else if (e.error === 'network') {
+      status.textContent = '⚠️ Błąd sieci — potrzebny internet do rozpoznawania głosu';
+    } else {
+      status.textContent = '⚠️ Błąd: ' + e.error + ' — spróbuj jeszcze raz';
+    }
+    resetVoiceBtn();
+  };
+
+  recognition.onend = () => resetVoiceBtn();
+  recognition.start();
+
+  btn.onclick = () => { recognition.stop(); resetVoiceBtn(); };
+}
+
+function resetVoiceBtn() {
+  const btn = document.getElementById('voice-btn');
+  btn.innerHTML = '🎤 Dodaj głosowo';
+  btn.style.background = '';
+  btn.style.borderColor = '';
+  btn.disabled = false;
+  btn.onclick = null;
+}
+
+function parseVoiceCommand(text) {
+  const status = document.getElementById('voice-status');
+
+  const date = st.date || today();
+  const logs = st.logs[date] || {};
+  const tasks = st.tasks[date] || [];
+  const assigned = new Set(tasks.map(t=>t.person));
+  const available = PERSONS.filter(p => {
+    if (assigned.has(p)) return false;
+    const pLog = logs[p];
+    return !pLog || !pLog.extra || parseFloat(pLog.extra) === 0;
+  });
+
+  const numWords = {
+    'jeden':1,'jedna':1,'jedno':1,'dwa':2,'dwie':2,'dwoch':2,'dwóch':2,
+    'trzy':3,'trzech':3,'cztery':4,'czterech':4,'piec':5,'pieciu':5,
+    'szesc':6,'siedem':7,'osiem':8,'dziewiec':9,'dziesiec':10,
+    'jedenasce':11,'dwanascie':12,'trzynascie':13,'czternascie':14,'pietnascie':15,
+    'szesnascie':16,'siedemnascie':17,'osiemnascie':18,'dziewietnascie':19,'dwadziescia':20
+  };
+
+  function wordToNum(t, word) {
+    const m = t.match(new RegExp('(\\d+)[^\\d]{0,5}' + word));
+    if (m) return parseInt(m[1]);
+    const m2 = t.match(new RegExp(word + '[^\\d]{0,5}(\\d+)'));
+    if (m2) return parseInt(m2[1]);
+    for (const [w,n] of Object.entries(numWords)) {
+      if (new RegExp(w + '[^a-z]{0,5}' + word).test(t)) return n;
+      if (new RegExp(word + '[^a-z]{0,5}' + w).test(t)) return n;
+    }
+    return null;
+  }
+
+  function extractNumber(t) {
+    const m = t.match(/(\d+(?:[.,]\d+)?)/);
+    return m ? parseFloat(m[1].replace(',','.')) : null;
+  }
+
+  // Find person
+  let foundPerson = null;
+  for (const p of PERSONS) {
+    const fn = p.split(' ')[0].toLowerCase();
+    const ln = p.split(' ')[1] ? p.split(' ')[1].toLowerCase() : '';
+    if (text.includes(fn) || (ln && text.includes(ln))) { foundPerson = p; break; }
+  }
+
+  if (!foundPerson) {
+    status.textContent = 'Nie rozpoznalem pracownika. Powiedz np: "Ewa 4 studia flat 1 12 16"';
+    return;
+  }
+
+  // Extract flat numbers — collect all digits mentioned
+  // "flat 15" or "flaty 1 12 16 23" or "na flacie 5"
+  const flatMatches = [];
+  const flatGroupMatch = text.match(/flat[yi]?\s+([\d\s,i]+)/);
+  if (flatGroupMatch) {
+    const nums = flatGroupMatch[1].match(/\d+/g);
+    if (nums) flatMatches.push(...nums.map(n => 'Flat ' + n));
+  } else {
+    const singleFlat = text.match(/(?:na\s+)?flac?ie?\s*(\d+)/);
+    if (singleFlat) flatMatches.push('Flat ' + singleFlat[1]);
+  }
+
+  // Detect tasks in the sentence
+  const detectedTasks = [];
+
+  // Sprawdzanie with hours
+  const sprawdz = text.match(/(\d+(?:[.,]\d+)?)\s*h?\s*sprawdza/);
+  const sprawdz2 = text.match(/sprawdza\w*\s+(\d+(?:[.,]\d+)?)\s*h/);
+  const sprawdzH = sprawdz ? parseFloat(sprawdz[1].replace(',','.')) : (sprawdz2 ? parseFloat(sprawdz2[1].replace(',','.')) : null);
+  if (sprawdzH) {
+    const idx = st.types.findIndex(t => t.name === 'Sprawdzanie');
+    if (idx >= 0) detectedTasks.push({ typeIdx: idx, type: st.types[idx], qty: 1, customH: sprawdzH, flat: flatMatches[0] || '' });
+  }
+
+  // Studio
+  const studioCount = wordToNum(text, 'studio') || wordToNum(text, 'studiow') || (text.includes('studio') ? 1 : null);
+  if (studioCount) {
+    const idx = st.types.findIndex(t => t.name === 'Studio');
+    if (idx >= 0) {
+      // Multiple studios with different flats
+      if (flatMatches.length > 1) {
+        flatMatches.forEach(flat => {
+          detectedTasks.push({ typeIdx: idx, type: st.types[idx], qty: 1, flat });
+        });
+      } else {
+        detectedTasks.push({ typeIdx: idx, type: st.types[idx], qty: studioCount, flat: flatMatches[0] || '' });
+      }
+    }
+  }
+
+  // Large Kitchen + rooms
+  const hasLarge = (text.includes('duza') && text.includes('kuchnia')) || text.includes('large');
+  // Kitchen + rooms
+  const hasKitchen = !hasLarge && (text.includes('kuchnia') || text.includes('kitchen'));
+  // rooms count
+  const roomCount = wordToNum(text, 'pokoj') || wordToNum(text, 'pokoi') || wordToNum(text, 'pokoje') ||
+                    wordToNum(text, 'sypialnie') || wordToNum(text, 'sypialni') ||
+                    wordToNum(text, 'bedroom') || wordToNum(text, 'bedrooms');
+
+  // Count kitchens
+  const kitchenCount = wordToNum(text, 'kuchni') || wordToNum(text, 'kuchnie') || wordToNum(text, 'kitchen');
+
+  if (hasLarge && roomCount) {
+    let name = roomCount <= 6 ? 'Large Kitchen + 6 Bedrooms' : roomCount <= 8 ? 'Large Kitchen + 8 Bedrooms' : 'Large Kitchen + 10 Bedrooms';
+    const idx = st.types.findIndex(t => t.name === name);
+    if (idx >= 0) detectedTasks.push({ typeIdx: idx, type: st.types[idx], qty: 1, flat: flatMatches[0] || '' });
+  } else if (hasKitchen && roomCount) {
+    let name = roomCount <= 4 ? 'Kitchen + 4 Bedrooms' : roomCount <= 5 ? 'Kitchen + 5 Bedrooms' : 'Kitchen + 6 Bedrooms';
+    const idx = st.types.findIndex(t => t.name === name);
+    if (idx >= 0) detectedTasks.push({ typeIdx: idx, type: st.types[idx], qty: 1, flat: flatMatches[0] || '' });
+  } else if (hasLarge && !studioCount) {
+    const idx = st.types.findIndex(t => t.name === 'Large Kitchen');
+    if (idx >= 0) {
+      const cnt = kitchenCount || 1;
+      detectedTasks.push({ typeIdx: idx, type: st.types[idx], qty: cnt, flat: flatMatches[0] || '' });
+    }
+  } else if (hasKitchen && !studioCount) {
+    const idx = st.types.findIndex(t => t.name === 'Kitchen');
+    if (idx >= 0) {
+      const cnt = kitchenCount || 1;
+      detectedTasks.push({ typeIdx: idx, type: st.types[idx], qty: cnt, flat: flatMatches[0] || '' });
+    }
+  }
+
+  // Ensuite bedroom / pokoje alone
+  const hasRoomOnly = !hasKitchen && !hasLarge && !studioCount && roomCount;
+  if (hasRoomOnly) {
+    const idx = st.types.findIndex(t => t.name === 'Ensuite Bedroom');
+    if (idx >= 0) detectedTasks.push({ typeIdx: idx, type: st.types[idx], qty: roomCount, flat: flatMatches[0] || '' });
+  }
+
+  // Bathroom
+  if (text.includes('lazienka') || text.includes('bathroom')) {
+    const cnt = wordToNum(text, 'lazienka') || wordToNum(text, 'bathroom') || 1;
+    const idx = st.types.findIndex(t => t.name === 'Bathroom');
+    if (idx >= 0) detectedTasks.push({ typeIdx: idx, type: st.types[idx], qty: cnt, flat: flatMatches[0] || '' });
+  }
+
+  // Bedding
+  if (text.includes('posciel') || text.includes('bedding')) {
+    const cnt = wordToNum(text, 'posciel') || wordToNum(text, 'bedding') || 1;
+    const idx = st.types.findIndex(t => t.name === 'Bedding');
+    if (idx >= 0) detectedTasks.push({ typeIdx: idx, type: st.types[idx], qty: cnt, flat: flatMatches[0] || '' });
+  }
+
+  if (!detectedTasks.length) {
+    status.textContent = 'Nie rozpoznalem zadania. Powiedz np: "Ewa 4 studia flat 1 12 16 23"';
+    return;
+  }
+
+  // Add all detected tasks
+  const addedNames = [];
+  detectedTasks.forEach(task => {
+    document.getElementById('a-person').value = foundPerson;
+    document.getElementById('a-type').value = task.typeIdx;
+    document.getElementById('a-qty').value = task.qty;
+    document.getElementById('a-loc').value = task.flat;
+    onTypeChange();
+    if (task.customH !== undefined) {
+      const customInput = document.getElementById('custom-hours');
+      if (customInput) customInput.value = task.customH;
+    }
+    addTask();
+    addedNames.push(task.type.name + (task.qty > 1 ? ' x' + task.qty : '') + (task.flat ? ' (' + task.flat + ')' : ''));
+  });
+
+  status.textContent = 'Dodano ' + detectedTasks.length + ' zad. dla ' + foundPerson.split(' ')[0] + ': ' + addedNames.join(', ');
+  status.style.color = '#0f6e56';
+  setTimeout(function() { status.style.display = 'none'; status.style.color = ''; }, 5000);
+}
+window.startVoice = startVoice;
+
 function logChange(action, description, snapshot) {
   if (!st.history) st.history = [];
   const now = new Date();
@@ -1236,6 +1475,7 @@ function sendBackup() {
 window.sendBackup = sendBackup;
 
 document.getElementById('sync-btn').addEventListener('click', syncFromSheets);
+document.getElementById('voice-btn').addEventListener('click', startVoice);
 document.getElementById('confirm-ok-btn').addEventListener('click', doRemoveTask);
 document.getElementById('confirm-cancel-btn').addEventListener('click', () => {
   pendingRemove = null;
