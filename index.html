@@ -7,6 +7,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#1a1a2e">
 <title>Dziennik</title>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+</script>
 <style>
   :root {
     --bg: #f5f4f0;
@@ -370,6 +375,11 @@ function saveState() {
 }
 
 function syncToSheets() {
+  if (!navigator.onLine) {
+    setSyncStatus('offline');
+    localStorage.setItem('cleaning_pending_sync', 'true');
+    return;
+  }
   setSyncStatus('syncing');
   fetch(SYNC_URL, {
     method: 'POST',
@@ -379,12 +389,17 @@ function syncToSheets() {
   .then(r => r.text())
   .then(() => {
     lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+    localStorage.removeItem('cleaning_pending_sync');
     setSyncStatus('ok');
   })
-  .catch(() => setSyncStatus('error'));
+  .catch(() => {
+    setSyncStatus('offline');
+    localStorage.setItem('cleaning_pending_sync', 'true');
+  });
 }
 
 function syncFromSheets() {
+  if (!navigator.onLine) { setSyncStatus('offline'); return; }
   setSyncStatus('syncing');
   fetch(SYNC_URL)
   .then(r => r.json())
@@ -404,7 +419,7 @@ function syncFromSheets() {
       setSyncStatus('ok');
     }
   })
-  .catch(() => setSyncStatus('error'));
+  .catch(() => { setSyncStatus('offline'); localStorage.setItem('cleaning_pending_sync', 'true'); });
 }
 
 function setSyncStatus(status) {
@@ -413,7 +428,15 @@ function setSyncStatus(status) {
   if (status === 'syncing') { el.textContent = '🔄 Synchronizacja...'; el.style.color = 'rgba(255,255,255,.6)'; }
   if (status === 'ok') { el.textContent = '✓ Zsynchronizowano' + (lastSyncTime ? ' ' + lastSyncTime : ''); el.style.color = '#a8f0c8'; }
   if (status === 'error') { el.textContent = '⚠️ Błąd sync'; el.style.color = '#f0a8a8'; }
+  if (status === 'offline') { el.textContent = '📵 Offline — zapisano lokalnie'; el.style.color = '#f0d080'; }
 }
+
+window.addEventListener('online', () => {
+  const pending = localStorage.getItem('cleaning_pending_sync');
+  if (pending) { showToast('📶 Połączono — synchronizuję...'); syncToSheets(); }
+  else setSyncStatus('ok');
+});
+window.addEventListener('offline', () => setSyncStatus('offline'));
 function today() { return new Date().toISOString().slice(0,10); }
 function formatDate(d) {
   if (!d) return '';
