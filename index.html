@@ -419,8 +419,13 @@ function syncToSheets() {
   });
 }
 
-function syncFromSheets() {
+function syncFromSheets(isAutoLoad) {
   if (!navigator.onLine) { setSyncStatus('offline'); return; }
+  if (isAutoLoad && localStorage.getItem('cleaning_pending_sync')) {
+    setSyncStatus('ok');
+    syncToSheets();
+    return;
+  }
   setSyncStatus('syncing');
   fetch(SYNC_URL)
   .then(r => r.json())
@@ -1037,7 +1042,7 @@ function renderWeek() {
         } else if (groupSize > 1) {
           const gcd = (a,b) => b ? gcd(b, a%b) : a;
           const g = gcd(1, groupSize);
-          display = `1/${groupSize/g}`;
+          const display = `1/${groupSize/g}`;
           return `${t.qty>1?t.qty+'× ':''}${display} ${baseName}`;
         }
         return `${t.qty>1?t.qty+'× ':''}${baseName}`;
@@ -1252,7 +1257,7 @@ document.getElementById('week-prev').addEventListener('click', () => shiftWeek(-
 document.getElementById('week-next').addEventListener('click', () => shiftWeek(1));
 
 // Auto-sync on load
-syncFromSheets();
+syncFromSheets(true);
 document.getElementById('day-prev').addEventListener('click', () => shiftDay(-1));
 document.getElementById('day-next').addEventListener('click', () => shiftDay(1));
 document.getElementById('open-date-modal').addEventListener('click', openDateModal);
