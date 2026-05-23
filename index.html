@@ -382,17 +382,19 @@ function toggleReClean() {
 const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxwr16s4QGOu7ybvKPEmXMf97BBazB9c2exi2TdskKDFLGKQoLrdkjpoNijt7qZKPw_Lg/exec';
 let syncTimeout = null;
 let lastSyncTime = null;
+let isSaving = false;
 
 function loadState() {
   try {
     const s = localStorage.getItem('cleaning_v4');
     if (s) return JSON.parse(s);
   } catch(e) {}
-  return { types: DEFAULT_TYPES, tasks: {}, logs: {}, date: today() };
+  return { types: DEFAULT_TYPES, tasks: {}, logs: {}, date: today(), lastModified: Date.now() };
 }
 
 function saveState() {
   st.lastModified = Date.now();
+  isSaving = true;
   try { localStorage.setItem('cleaning_v4', JSON.stringify(st)); } catch(e) {}
   clearTimeout(syncTimeout);
   syncTimeout = setTimeout(syncToSheets, 800);
@@ -402,6 +404,7 @@ function syncToSheets() {
   if (!navigator.onLine) {
     setSyncStatus('offline');
     localStorage.setItem('cleaning_pending_sync', 'true');
+    isSaving = false;
     return;
   }
   setSyncStatus('syncing');
@@ -415,38 +418,37 @@ function syncToSheets() {
     lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
     localStorage.removeItem('cleaning_pending_sync');
     setSyncStatus('ok');
+    isSaving = false;
   })
   .catch(() => {
     setSyncStatus('offline');
     localStorage.setItem('cleaning_pending_sync', 'true');
+    isSaving = false;
   });
 }
 
 function syncFromSheets(isAutoLoad) {
   if (!navigator.onLine) { setSyncStatus('offline'); return; }
+  // Nie pobieraj podczas zapisywania lub gdy są niezapisane zmiany
+  if (isSaving) { return; }
   if (isAutoLoad && localStorage.getItem('cleaning_pending_sync')) {
     setSyncStatus('ok');
     syncToSheets();
     return;
   }
   if (!isAutoLoad) setSyncStatus('syncing');
-  fetch(SYNC_URL)
+  // Anti-cache: dodaj timestamp do URL
+  fetch(SYNC_URL + '?t=' + Date.now())
   .then(r => r.json())
   .then(data => {
+    if (isSaving) { setSyncStatus('ok'); return; } // zmiana w trakcie pobierania
     if (data && data.tasks) {
       const cloudTime = data.lastModified || 0;
       const localTime = st.lastModified || 0;
-      // KLUCZOWE: pobieraj z chmury TYLKO jeśli dane są nowsze niż lokalne
-      // Inaczej zachowaj lokalne (świeższe) i wyślij je do chmury
-      if (cloudTime < localTime) {
-        // Lokalne są nowsze — nie nadpisuj, wyślij lokalne do chmury
+      if (cloudTime <= localTime) {
+        // Lokalne nowsze lub identyczne — nie nadpisuj
         setSyncStatus('ok');
-        syncToSheets();
-        return;
-      }
-      if (cloudTime === localTime) {
-        // Identyczne — nic nie rób
-        setSyncStatus('ok');
+        if (cloudTime < localTime) syncToSheets();
         return;
       }
       // Chmura nowsza — pobierz
