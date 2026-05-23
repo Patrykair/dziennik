@@ -235,6 +235,12 @@ if ('serviceWorker' in navigator) {
         <label class="form-label">Typ zadania</label>
         <select id="a-type" onchange="onTypeChange()"></select>
       </div>
+      <div class="form-group">
+        <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="bedding-toggle" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
+          Bedding (dolicz wg liczby pokoi)
+        </label>
+      </div>
       <div class="form-group" id="custom-hours-row" style="display:none">
         <label class="form-label">Godziny dla Sprawdzania</label>
         <input type="number" id="custom-hours" placeholder="Wpisz godziny" step="0.25" min="0.25" onchange="previewHours()">
@@ -588,7 +594,34 @@ function getSelectedPersons() {
 }
 function initTypeSelect() {
   const s = document.getElementById('a-type');
-  s.innerHTML = st.types.map((t,i)=>`<option value="${i}">${t.name}${t.custom ? '' : ' ('+t.h+'h)'}</option>`).join('');
+  // Kolejnosc wyswietlania wedlug preferencji uzytkownika
+  const order = [
+    'Ensuite Bedroom',
+    'Kitchen',
+    'Large Kitchen',
+    'Kitchen + 4 Bedrooms',
+    'Kitchen + 5 Bedrooms',
+    'Kitchen + 6 Bedrooms',
+    'Large Kitchen + 6 Bedrooms',
+    'Large Kitchen + 8 Bedrooms',
+    'Large Kitchen + 10 Bedrooms',
+    'Studio',
+    'Sprawdzanie',
+    'Non ensuite bedroom',
+    'Bathroom',
+    'Bedding'
+  ];
+  // Posortuj typy wg kolejnosci, zachowujac oryginalne indeksy
+  const sorted = st.types
+    .map((t, i) => ({ type: t, idx: i }))
+    .sort((a, b) => {
+      const ia = order.indexOf(a.type.name);
+      const ib = order.indexOf(b.type.name);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+  s.innerHTML = sorted.map(({type, idx}) =>
+    `<option value="${idx}">${type.name}${type.custom ? '' : ' ('+type.h+'h)'}</option>`
+  ).join('');
   onTypeChange();
 }
 function onTypeChange() {
