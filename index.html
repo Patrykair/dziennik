@@ -392,8 +392,8 @@ function loadState() {
 }
 
 function saveState() {
+  st.lastModified = Date.now();
   try { localStorage.setItem('cleaning_v4', JSON.stringify(st)); } catch(e) {}
-  // Debounce — przy szybkich zmianach zapisz raz, kompletny stan
   clearTimeout(syncTimeout);
   syncTimeout = setTimeout(syncToSheets, 800);
 }
@@ -429,11 +429,27 @@ function syncFromSheets(isAutoLoad) {
     syncToSheets();
     return;
   }
-  setSyncStatus('syncing');
+  if (!isAutoLoad) setSyncStatus('syncing');
   fetch(SYNC_URL)
   .then(r => r.json())
   .then(data => {
     if (data && data.tasks) {
+      const cloudTime = data.lastModified || 0;
+      const localTime = st.lastModified || 0;
+      // KLUCZOWE: pobieraj z chmury TYLKO jeśli dane są nowsze niż lokalne
+      // Inaczej zachowaj lokalne (świeższe) i wyślij je do chmury
+      if (cloudTime < localTime) {
+        // Lokalne są nowsze — nie nadpisuj, wyślij lokalne do chmury
+        setSyncStatus('ok');
+        syncToSheets();
+        return;
+      }
+      if (cloudTime === localTime) {
+        // Identyczne — nic nie rób
+        setSyncStatus('ok');
+        return;
+      }
+      // Chmura nowsza — pobierz
       st = data;
       if (!st.types || !st.types.length) st.types = DEFAULT_TYPES;
       st.date = today();
