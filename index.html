@@ -393,7 +393,9 @@ function loadState() {
 
 function saveState() {
   try { localStorage.setItem('cleaning_v4', JSON.stringify(st)); } catch(e) {}
-  syncToSheets();
+  // Debounce — przy szybkich zmianach zapisz raz, kompletny stan
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(syncToSheets, 800);
 }
 
 function syncToSheets() {
@@ -854,7 +856,7 @@ function renderSummary() {
   sWrap.innerHTML = '<div class="section-label">Szczegóły według pracownika</div>' + cards;
 }
 
-const DRIVERS = ['Natalia Laszewska','Maciej Skrouba','Piotr Czaja','Kamil Gumieniak'];
+const DRIVERS = ['Natalia Laszewska','Maciej Skrouba','Piotr Czaja','Kamil Gumieniak','Patryk Szymborski'];
 
 function renderHours() {
   const date = st.date || today();
@@ -1259,6 +1261,20 @@ document.getElementById('week-next').addEventListener('click', () => shiftWeek(1
 
 // Auto-sync on load
 syncFromSheets(true);
+
+// Auto-sync co 15 sekund — pobiera zmiany z innych urządzeń
+setInterval(() => {
+  if (!navigator.onLine) return;
+  // Nie pobieraj jeśli są lokalne niezapisane zmiany (najpierw je wyślij)
+  if (localStorage.getItem('cleaning_pending_sync')) {
+    syncToSheets();
+    return;
+  }
+  // Nie pobieraj jeśli użytkownik właśnie coś wpisuje (focus na input)
+  const active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')) return;
+  syncFromSheets(false);
+}, 15000);
 document.getElementById('day-prev').addEventListener('click', () => shiftDay(-1));
 document.getElementById('day-next').addEventListener('click', () => shiftDay(1));
 document.getElementById('open-date-modal').addEventListener('click', openDateModal);
