@@ -248,7 +248,7 @@ if ('serviceWorker' in navigator) {
       <div class="row2">
         <div class="form-group">
           <label class="form-label">Ilość (szt.)</label>
-          <input type="number" id="a-qty" value="1" min="1" onchange="previewHours()">
+          <input type="number" id="a-qty" value="1" min="0.25" step="0.25" onchange="previewHours()">
         </div>
         <div class="form-group">
           <label class="form-label">Flat</label>
@@ -637,7 +637,7 @@ function onTypeChange() {
 }
 function previewHours() {
   const idx = document.getElementById('a-type').value;
-  const qty = parseInt(document.getElementById('a-qty').value)||1;
+  const qty = parseFloat(document.getElementById('a-qty').value)||1;
   const type = st.types[idx];
   if (!type) return;
   let h = type.custom ? (parseFloat(document.getElementById('custom-hours').value)||0) : type.h;
@@ -654,7 +654,7 @@ function addTask() {
   const persons = getSelectedPersons();
   if (!persons.length) { alert('Zaznacz przynajmniej jedną osobę!'); return; }
   const idx = parseInt(document.getElementById('a-type').value);
-  const qty = parseInt(document.getElementById('a-qty').value)||1;
+  const qty = parseFloat(document.getElementById('a-qty').value)||1;
   const loc = document.getElementById('a-loc').value.trim();
   const type = st.types[idx];
   if (!type) return;
@@ -691,6 +691,50 @@ function addTask() {
   document.getElementById('collab-list-wrap').style.display = 'none';
   document.querySelectorAll('#collab-checklist input').forEach(el=>{ el.checked=false; });
   logChange('Dodano zadanie', `${label} → ${persons.join(', ')}${loc?' (Flat: '+loc+')':''}`, snap);
+
+  // BEDDING — automatycznie dolicz wg liczby pokoi
+  const beddingToggle = document.getElementById('bedding-toggle');
+  if (beddingToggle && beddingToggle.checked) {
+    // Mapa: ile pokoi ma kazdy typ kombinowany
+    const ROOMS_IN_TYPE = {
+      'Kitchen + 4 Bedrooms': 4, 'Kitchen + 5 Bedrooms': 5, 'Kitchen + 6 Bedrooms': 6,
+      'Large Kitchen + 6 Bedrooms': 6, 'Large Kitchen + 8 Bedrooms': 8, 'Large Kitchen + 10 Bedrooms': 10
+    };
+    // Ile beddingow: dla typow z pokojami = liczba pokoi x qty, dla Ensuite = qty
+    let beddingCount = 0;
+    if (ROOMS_IN_TYPE[type.name]) {
+      beddingCount = ROOMS_IN_TYPE[type.name] * qty;
+    } else if (type.name === 'Ensuite Bedroom' || type.name === 'Non ensuite bedroom') {
+      beddingCount = qty;
+    } else if (type.name === 'Studio') {
+      beddingCount = qty; // studio = 1 lozko
+    }
+
+    if (beddingCount > 0) {
+      const beddingType = st.types.find(t => t.name === 'Bedding');
+      const beddingH = beddingType ? beddingType.h : 0.25;
+      const beddingPerPerson = (beddingH * beddingCount) / persons.length / beddingCount; // h za sztuke na osobe
+      persons.forEach((person, i) => {
+        const others = persons.filter(p=>p!==person);
+        const bId = Date.now() + 1000 + i;
+        st.tasks[date].push({
+          id: bId,
+          person,
+          typeName: 'Bedding' + groupLabel,
+          h: beddingH / persons.length,
+          qty: beddingCount,
+          loc,
+          groupWith: isGroup ? others : null,
+          groupId: groupId ? groupId + 1 : null
+        });
+        if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0};
+        st.logs[date][person].done[bId] = true;
+      });
+      logChange('Dodano zadanie', `Bedding ×${beddingCount} → ${persons.join(', ')}`, snap);
+    }
+    beddingToggle.checked = false;
+  }
+
   saveState();
   renderAssign();
   previewHours();
@@ -768,7 +812,7 @@ function renderAssign() {
       const rows = pts.map(t=>`
         <div class="task-item">
           <div class="task-info">
-            <div class="task-name">${t.qty>1?t.qty+'× ':''}${t.typeName}${t.loc?' · '+t.loc:''}</div>
+            <div class="task-name">${t.qty!==1?t.qty+'× ':''}${t.typeName}${t.loc?' · '+t.loc:''}</div>
             ${t.groupWith&&t.groupWith.length?`<div style="margin-top:3px">${t.groupWith.map(p=>`<span class="pair-badge"><span class="pair-avatar">${initials(p)}</span> ${p.split(' ')[0]}</span>`).join(' ')}</div>`:''}
           </div>
           <span class="task-h">${fh(t.h*t.qty)}</span>
@@ -849,7 +893,7 @@ function renderSummary() {
     const noteText = pLog.note || '';
     const taskLines = pts.map(t=>`
       <div class="sum-row">
-        <span style="color:var(--text2);flex:1">${t.qty>1?t.qty+'× ':''}${t.typeName}${t.loc?' · '+t.loc:''}</span>
+        <span style="color:var(--text2);flex:1">${t.qty!==1?t.qty+'× ':''}${t.typeName}${t.loc?' · '+t.loc:''}</span>
         <span style="margin-right:8px">${fh(t.h*t.qty)}</span>
         <button class="del-btn" data-date="${date}" data-id="${t.id}" data-gid="${t.groupId||''}" onclick="removeTask(this.dataset.date,+this.dataset.id,this.dataset.gid);renderSummary()">
           <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
