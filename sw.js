@@ -1,36 +1,32 @@
 const CACHE_NAME = 'dziennik-v1';
-const ASSETS = ['./index.html'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      Promise.all(keys.map(k => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
-  // For Google Sheets sync — always use network
+  // Google Sheets — zawsze sieć
   if (e.request.url.includes('script.google.com')) {
     e.respondWith(fetch(e.request).catch(() => new Response('offline', {status: 503})));
     return;
   }
-  // For app assets — cache first, fallback to network
+  // Dla index.html — zawsze pobieraj świeżą wersję z sieci, cache tylko jako fallback
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      return cached || fetch(e.request).then(response => {
+    fetch(e.request)
+      .then(response => {
         const clone = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(e.request))
   );
 });
