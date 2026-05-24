@@ -713,19 +713,21 @@ function addTask() {
     if (beddingCount > 0) {
       const beddingType = st.types.find(t => t.name === 'Bedding');
       const beddingH = beddingType ? beddingType.h : 0.25;
-      const beddingPerPerson = (beddingH * beddingCount) / persons.length / beddingCount; // h za sztuke na osobe
+      const beddingGroupId = isGroup ? Date.now() + 500 + Math.random() * 100 | 0 : null;
       persons.forEach((person, i) => {
         const others = persons.filter(p=>p!==person);
         const bId = Date.now() + 1000 + i;
+        // h za 1 sztuke podzielone na liczbe osob
+        const hPerPersonPerUnit = beddingH / persons.length;
         st.tasks[date].push({
           id: bId,
           person,
           typeName: 'Bedding' + groupLabel,
-          h: beddingH / persons.length,
+          h: hPerPersonPerUnit,
           qty: beddingCount,
           loc,
           groupWith: isGroup ? others : null,
-          groupId: groupId ? groupId + 1 : null
+          groupId: beddingGroupId
         });
         if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0};
         st.logs[date][person].done[bId] = true;
@@ -1113,34 +1115,35 @@ function renderWeek() {
         'Large Kitchen + 8 Bedrooms':  {'Large Kitchen':1, 'Ensuite Bedroom':8},
         'Large Kitchen + 10 Bedrooms': {'Large Kitchen':1, 'Ensuite Bedroom':10},
       };
-      const taskNames = pts.map(t => {
+      // Agreguj zadania po typie — sumuj qty tego samego typu
+      function qtyLabel(q) {
+        if (q === 1) return '';
+        if (Number.isInteger(q)) return q + '× ';
+        const fracs = {0.25:'1/4', 0.5:'1/2', 0.75:'3/4', 1.5:'1 1/2', 2.5:'2 1/2'};
+        return (fracs[q] || q) + '× ';
+      }
+      const typeAgg = {};
+      pts.forEach(t => {
         const baseName = t.typeName.replace(/ 👥×\d+/,'').replace(' (re-clean)','').trim();
         const groupSize = (t.groupWith && Array.isArray(t.groupWith) && t.groupWith.length > 0) ? t.groupWith.length + 1 : 1;
         const mapping = COMBINED_MAP_WEEK[baseName];
-        if (groupSize > 1 && mapping) {
-          const parts = Object.entries(mapping).map(([part, n]) => {
-            const divided = n / groupSize;
-            let display;
-            if (Number.isInteger(divided)) {
-              display = divided;
-            } else {
-              const gcd = (a,b) => b ? gcd(b, a%b) : a;
-              const g = gcd(n, groupSize);
-              const num = n/g, den = groupSize/g;
-              const whole = Math.floor(num/den);
-              const rem = num % den;
-              display = whole > 0 ? `${whole} ${rem}/${den}` : `${rem}/${den}`;
-            }
-            return `${display} ${part}`;
-          }).join(' + ');
-          return `${t.qty>1?t.qty+'× ':''}${parts}`;
-        } else if (groupSize > 1) {
-          const gcd = (a,b) => b ? gcd(b, a%b) : a;
-          const g = gcd(1, groupSize);
-          const display = `1/${groupSize/g}`;
-          return `${t.qty>1?t.qty+'× ':''}${display} ${baseName}`;
+        if (mapping && groupSize > 1) {
+          // Rozloz na komponenty podzielone przez grupowosc
+          Object.entries(mapping).forEach(([part, n]) => {
+            typeAgg[part] = (typeAgg[part] || 0) + (n * (t.qty||1)) / groupSize;
+          });
+        } else if (mapping) {
+          Object.entries(mapping).forEach(([part, n]) => {
+            typeAgg[part] = (typeAgg[part] || 0) + n * (t.qty||1);
+          });
+        } else {
+          const effectiveQty = (t.qty||1) / groupSize;
+          typeAgg[baseName] = (typeAgg[baseName] || 0) + effectiveQty;
         }
-        return `${t.qty>1?t.qty+'× ':''}${baseName}`;
+      });
+      const taskNames = Object.entries(typeAgg).map(([name, total]) => {
+        const rounded = Math.round(total * 100) / 100;
+        return `${qtyLabel(rounded)}${name}`;
       }).join(', ');
       const extraNote = pLog.extra > 0 ? `+${fh(parseFloat(pLog.extra))}` : '';
       const execLabel = taskNames ? (extraNote ? taskNames + ', ' + extraNote : taskNames) : (extraNote || '—');
