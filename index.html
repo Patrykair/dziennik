@@ -1152,9 +1152,12 @@ function renderWeek() {
       return `<tr style="${isToday?'background:var(--accent-light);':''}">
         <td style="padding:5px 6px;font-size:12px;color:var(--text2);white-space:nowrap">${dayNames[i]}</td>
         <td style="padding:5px 6px;font-size:12px;color:var(--text3)">${execLabel}${earned>0?' <span style="color:var(--text3);font-size:11px">('+fh(earned)+')</span>':''}</td>
+        ${isDriverPerson?`
+          <td style="padding:5px 6px;font-size:12px;color:#27ae60;text-align:right;white-space:nowrap">${drivingReal>0?'+'+fh(drivingReal):'—'}</td>
+          <td style="padding:5px 6px;font-size:12px;color:var(--warn);text-align:right;white-space:nowrap">${driving>0?'-'+fh(driving):'—'}</td>
+        `:''}
         <td style="padding:5px 6px;font-size:12px;color:var(--text2);text-align:right;white-space:nowrap">${system>0?fh(system):'—'}</td>
-        ${isDriverPerson?`<td style="padding:5px 6px;font-size:12px;color:var(--warn);text-align:right;white-space:nowrap">${driving>0?fh(driving):'—'}</td>`:''}
-        <td style="padding:5px 6px;font-size:12px;text-align:right;white-space:nowrap" class="${earned>0||system>0?diffClass:''}">${earned>0||system>0||driving>0?diffStr:'—'}</td>
+        <td style="padding:5px 6px;font-size:12px;text-align:right;white-space:nowrap" class="${earned>0||system>0?diffClass:''}">${earned>0||system>0||driving>0||drivingReal>0?diffStr:'—'}</td>
       </tr>`;
     }).join('');
 
@@ -1174,8 +1177,11 @@ function renderWeek() {
             <tr>
               <th style="font-size:10px;font-weight:600;color:var(--text3);padding:6px 6px 4px;text-align:left">DZIEŃ</th>
               <th style="font-size:10px;font-weight:600;color:var(--text3);padding:6px 6px 4px;text-align:left">WYKONANE</th>
+              ${isDriverPerson?`
+                <th style="font-size:10px;font-weight:600;color:#27ae60;padding:6px 6px 4px;text-align:right">FAKT.KIER.</th>
+                <th style="font-size:10px;font-weight:600;color:var(--warn);padding:6px 6px 4px;text-align:right">KIER.POL.</th>
+              `:''}
               <th style="font-size:10px;font-weight:600;color:var(--text3);padding:6px 6px 4px;text-align:right">POLIMAN</th>
-              ${isDriverPerson?'<th style="font-size:10px;font-weight:600;color:var(--warn);padding:6px 6px 4px;text-align:right">KIER.</th>':''}
               <th style="font-size:10px;font-weight:600;color:var(--text3);padding:6px 6px 4px;text-align:right">BILANS</th>
             </tr>
           </thead>
@@ -1183,8 +1189,11 @@ function renderWeek() {
           <tfoot>
             <tr style="border-top:1px solid var(--border)">
               <td colspan="2" style="padding:6px 6px;font-size:13px;font-weight:500">Suma tygodnia</td>
+              ${isDriverPerson?`
+                <td style="padding:6px 6px;font-size:13px;color:#27ae60;text-align:right">${weekDrivingReal>0?'+'+fh(weekDrivingReal):'—'}</td>
+                <td style="padding:6px 6px;font-size:13px;color:var(--warn);text-align:right">${weekDriving>0?'-'+fh(weekDriving):'—'}</td>
+              `:''}
               <td style="padding:6px 6px;font-size:13px;color:var(--text2);text-align:right">${fh(weekSystem)}</td>
-              ${isDriverPerson?`<td style="padding:6px 6px;font-size:13px;color:var(--warn);text-align:right">${fh(weekDriving)}</td>`:''}
               <td style="padding:6px 6px;font-size:13px;text-align:right" class="${totalClass}">${totalDiffStr}</td>
             </tr>
           </tfoot>
