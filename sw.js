@@ -1,4 +1,4 @@
-const CACHE_NAME = 'dziennik-v1';
+const CACHE_NAME = 'dziennik-v2';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
@@ -8,9 +8,8 @@ self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.map(k => caches.delete(k)))
-    )
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
@@ -19,7 +18,7 @@ self.addEventListener('fetch', e => {
     e.respondWith(fetch(e.request).catch(() => new Response('offline', {status: 503})));
     return;
   }
-  // Dla index.html — zawsze pobieraj świeżą wersję z sieci, cache tylko jako fallback
+  // Network-first: zawsze świeża wersja, cache tylko offline fallback
   e.respondWith(
     fetch(e.request)
       .then(response => {

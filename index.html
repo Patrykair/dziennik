@@ -9,7 +9,23 @@
 <title>Dziennik</title>
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    // Sprawdzaj aktualizacje co zaladowanie
+    reg.update();
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'activated') {
+          // Nowa wersja gotowa — przeladuj
+          window.location.reload();
+        }
+      });
+    });
+  }).catch(()=>{});
+  // Sprawdzaj aktualizacje co 60s gdy aplikacja otwarta
+  setInterval(() => {
+    navigator.serviceWorker.getRegistration().then(reg => { if (reg) reg.update(); });
+  }, 60000);
 }
 </script>
 <style>
