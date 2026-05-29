@@ -219,7 +219,12 @@ if ('serviceWorker' in navigator) {
     <div class="card-body">
       <div class="form-group">
         <label class="form-label">Pracownik</label>
-        <select id="a-person" onchange="renderCollabList();previewHours()"></select>
+        <select id="a-person" onchange="renderCollabList();previewHours()" style="display:none"></select>
+        <button type="button" id="person-toggle" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:15px;font-family:var(--font-ui);cursor:pointer">
+          <span id="person-toggle-label">—</span>
+          <span style="color:var(--text3)">▾</span>
+        </button>
+        <div id="person-buttons" style="display:none;flex-direction:column;gap:6px;margin-top:6px;max-height:340px;overflow-y:auto"></div>
       </div>
       <div class="form-group">
         <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
@@ -391,11 +396,21 @@ let lastSyncTime = null;
 let isSaving = false;
 
 function loadState() {
+  let data;
   try {
     const s = localStorage.getItem('cleaning_v4');
-    if (s) return JSON.parse(s);
+    if (s) data = JSON.parse(s);
   } catch(e) {}
-  return { types: DEFAULT_TYPES, tasks: {}, logs: {}, date: today(), lastModified: Date.now() };
+  if (!data || typeof data !== 'object') {
+    data = {};
+  }
+  // Zapewnij wszystkie wymagane pola (odpornosc na uszkodzone/stare dane)
+  if (!data.types || !Array.isArray(data.types) || !data.types.length) data.types = DEFAULT_TYPES;
+  if (!data.tasks || typeof data.tasks !== 'object') data.tasks = {};
+  if (!data.logs || typeof data.logs !== 'object') data.logs = {};
+  if (!data.date) data.date = today();
+  if (!data.lastModified) data.lastModified = Date.now();
+  return data;
 }
 
 function saveState() {
@@ -459,7 +474,9 @@ function syncFromSheets(isAutoLoad) {
       }
       // Chmura nowsza — pobierz
       st = data;
-      if (!st.types || !st.types.length) st.types = DEFAULT_TYPES;
+      if (!st.types || !Array.isArray(st.types) || !st.types.length) st.types = DEFAULT_TYPES;
+      if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
+      if (!st.logs || typeof st.logs !== 'object') st.logs = {};
       st.date = today();
       localStorage.setItem('cleaning_v4', JSON.stringify(st));
       lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
@@ -548,16 +565,60 @@ function initPersonSelect() {
   const tasks = st.tasks[date] || [];
   const assignedPersons = new Set(tasks.map(t => t.person));
   const sel = document.getElementById('a-person');
-  const available = PERSONS.filter(p => {
-    if (assignedPersons.has(p)) return false;
-    const pLog = logs[p];
-    return !pLog || !pLog.extra || parseFloat(pLog.extra) === 0;
-  });
+  const btnWrap = document.getElementById('person-buttons');
+
+  // Hidden select - keep all persons as options for compatibility
   const current = sel.value;
-  sel.innerHTML = available.length
-    ? available.map(p=>`<option value="${p}">${p}</option>`).join('')
-    : '<option value="">— wszyscy mają zadania —</option>';
-  if (available.includes(current)) sel.value = current;
+  sel.innerHTML = PERSONS.map(p=>`<option value="${p}">${p}</option>`).join('');
+
+  // Wybierz pierwsza osobe bez zadan jako domyslna
+  const firstFree = PERSONS.find(p => !assignedPersons.has(p));
+  if (!current || !PERSONS.includes(current)) {
+    sel.value = firstFree || PERSONS[0];
+  } else {
+    sel.value = current;
+  }
+
+  // Build button list
+  btnWrap.innerHTML = PERSONS.map(p => {
+    const hasTask = assignedPersons.has(p);
+    const isSelected = p === sel.value;
+    const bg = hasTask ? '#d1f0dd' : (isSelected ? 'var(--accent)' : 'var(--bg)');
+    const color = isSelected && !hasTask ? '#fff' : 'var(--text)';
+    const border = isSelected ? 'var(--accent)' : 'var(--border)';
+    // Policz godziny pracy danej osoby na dzis
+    const pTasks = tasks.filter(t => t.person === p);
+    const pLog = logs[p] || {extra:0};
+    const hoursToday = pTasks.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(pLog.extra)||0);
+    const hoursLabel = hoursToday > 0 ? fh(hoursToday) : '';
+    return `<button type="button" class="person-btn" data-person="${escQ(p)}"
+      style="display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 12px;border:1.5px solid ${border};border-radius:var(--radius-sm);background:${bg};color:${color};font-size:14px;font-family:var(--font-ui);cursor:pointer">
+      <span style="flex:1">${p}${DRIVERS.includes(p)?' 🚗':''}</span>
+      <span style="font-size:13px;font-weight:600;color:${hasTask?'#16a34a':(isSelected?'#fff':'var(--text3)')}">${hoursLabel}</span>
+    </button>`;
+  }).join('');
+
+  // Click handlers
+  btnWrap.querySelectorAll('.person-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sel.value = btn.dataset.person;
+      btnWrap.style.display = 'none'; // zwin po wyborze
+      initPersonSelect();
+      renderCollabList();
+      previewHours();
+    });
+  });
+
+  // Ustaw label na przycisku rozwijajacym
+  const toggleLabel = document.getElementById('person-toggle-label');
+  if (toggleLabel) {
+    const selPerson = sel.value;
+    const pTasks = tasks.filter(t => t.person === selPerson);
+    const pLog = logs[selPerson] || {extra:0};
+    const h = pTasks.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(pLog.extra)||0);
+    toggleLabel.textContent = selPerson + (DRIVERS.includes(selPerson)?' 🚗':'') + (h>0?'  ('+fh(h)+')':'');
+  }
+
   renderCollabList();
 }
 
@@ -570,27 +631,27 @@ function toggleCollab() {
 function renderCollabList() {
   const date = st.date || today();
   const logs = st.logs[date] || {};
+  const tasks = st.tasks[date] || [];
+  const assignedPersons = new Set(tasks.map(t => t.person));
   const main = document.getElementById('a-person').value;
   const el = document.getElementById('collab-checklist');
-  const others = PERSONS.filter(p => {
-    if (p === main) return false;
-    const pLog = logs[p];
-    return !pLog || !pLog.extra || parseFloat(pLog.extra) === 0;
-  });
-  el.innerHTML = others.map(p=>`
-    <label class="person-check-item">
-      <input type="checkbox" value="${p}" onchange="previewHours()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
+  const others = PERSONS.filter(p => p !== main);
+  el.innerHTML = others.map(p=>{
+    const hasTask = assignedPersons.has(p);
+    return `<label class="person-check-item" style="${hasTask?'background:#d1f0dd;':''}">
+      <input type="checkbox" value="${escQ(p)}" onchange="previewHours()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
       <div class="pci-avatar">${initials(p)}</div>
-      <span class="pcname">${p}</span>
-    </label>`).join('');
+      <span class="pcname">${p}${hasTask?' ✓':''}</span>
+    </label>`;
+  }).join('');
 }
 
 function getSelectedPersons() {
   const main = document.getElementById('a-person').value;
   const collabOn = document.getElementById('collab-toggle').checked;
-  if (!collabOn) return [main];
+  if (!collabOn) return main ? [main] : [];
   const others = [...document.querySelectorAll('#collab-checklist input:checked')].map(el=>el.value);
-  return [main, ...others];
+  return [main, ...others].filter(p => p && p.trim());
 }
 function initTypeSelect() {
   const s = document.getElementById('a-type');
@@ -1351,6 +1412,10 @@ function sendBackup() {
 }
 window.sendBackup = sendBackup;
 
+document.getElementById('person-toggle').addEventListener('click', () => {
+  const bw = document.getElementById('person-buttons');
+  bw.style.display = bw.style.display === 'none' ? 'flex' : 'none';
+});
 document.getElementById('sync-btn').addEventListener('click', syncFromSheets);
 document.getElementById('confirm-ok-btn').addEventListener('click', doRemoveTask);
 document.getElementById('confirm-cancel-btn').addEventListener('click', () => {
