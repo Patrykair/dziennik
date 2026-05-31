@@ -311,6 +311,11 @@ if ('serviceWorker' in navigator) {
       <div id="backup-status" style="font-size:12px;color:var(--text2);margin-top:8px;text-align:center"></div>
       <button id="force-pull-btn" class="btn btn-secondary" style="width:100%;margin-top:10px">☁️⬇ Wymuś pobranie z chmury</button>
       <p style="font-size:11px;color:var(--text3);margin-top:6px">Użyj gdy urządzenia mają różne dane — pobierze wersję z Google Sheets na wszystkie.</p>
+      <label class="btn btn-secondary" style="width:100%;margin-top:10px;display:block;text-align:center;cursor:pointer">
+        📥 Wczytaj backup z pliku
+        <input type="file" id="import-backup-input" accept=".json,application/json" style="display:none">
+      </label>
+      <p style="font-size:11px;color:var(--text3);margin-top:6px">Wczytaj plik JSON z maila aby odzyskać dane.</p>
     </div>
   </div>
 </div>
@@ -465,6 +470,37 @@ function syncToSheets() {
     isSaving = false;
   });
 }
+
+function importBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || typeof data !== 'object' || !data.tasks) {
+        alert('Nieprawidłowy plik backupu.');
+        return;
+      }
+      if (!confirm('Wczytać dane z backupu? Obecne dane zostaną zastąpione.')) return;
+      st = data;
+      if (!st.types || !Array.isArray(st.types) || !st.types.length) st.types = DEFAULT_TYPES;
+      if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
+      if (!st.logs || typeof st.logs !== 'object') st.logs = {};
+      st.date = today();
+      st.lastModified = Date.now();
+      localStorage.setItem('cleaning_v4', JSON.stringify(st));
+      localStorage.removeItem('cleaning_pending_sync');
+      updateHeader(); initPersonSelect(); initTypeSelect(); refresh();
+      syncToSheets();
+      showToast('✓ Backup wczytany i wysłany do chmury');
+    } catch(err) {
+      alert('Błąd wczytywania pliku: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+window.importBackup = importBackup;
 
 function forcePullFromCloud() {
   if (!navigator.onLine) { setSyncStatus('offline'); return; }
@@ -1503,6 +1539,7 @@ document.getElementById('add-task-btn').addEventListener('click', addTask);
 document.getElementById('add-type-btn').addEventListener('click', addType);
 document.getElementById('backup-now-btn').addEventListener('click', sendBackup);
 document.getElementById('force-pull-btn').addEventListener('click', forcePullFromCloud);
+document.getElementById('import-backup-input').addEventListener('change', importBackup);
 document.getElementById('reclean-btn').addEventListener('click', toggleReClean);
 
 }); // end DOMContentLoaded
