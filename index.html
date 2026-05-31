@@ -444,13 +444,37 @@ function saveState() {
   syncTimeout = setTimeout(syncToSheets, 800);
 }
 
-function syncToSheets() {
+function syncToSheets(force) {
   if (!navigator.onLine) {
     setSyncStatus('offline');
     localStorage.setItem('cleaning_pending_sync', 'true');
     isSaving = false;
     return;
   }
+  // OCHRONA: nie wysylaj pustego stanu jesli w chmurze sa dane (chyba ze force)
+  const localEmpty = !st.tasks || Object.keys(st.tasks).length === 0;
+  if (localEmpty && !force) {
+    fetch(SYNC_URL + '?t=' + Date.now())
+      .then(r => r.json())
+      .then(cloud => {
+        const cloudHasData = cloud && cloud.tasks && Object.keys(cloud.tasks).length > 0;
+        if (cloudHasData) {
+          setSyncStatus('ok');
+          isSaving = false;
+          if (confirm('Lokalnie brak danych, ale w chmurze są zapisane zadania. Pobrać je z chmury?')) {
+            forcePullFromCloud(true);
+          }
+        } else {
+          doSyncToSheets();
+        }
+      })
+      .catch(() => { isSaving = false; setSyncStatus('error'); });
+    return;
+  }
+  doSyncToSheets();
+}
+
+function doSyncToSheets() {
   setSyncStatus('syncing');
   fetch(SYNC_URL, {
     method: 'POST',
@@ -492,7 +516,7 @@ function importBackup(event) {
       localStorage.setItem('cleaning_v4', JSON.stringify(st));
       localStorage.removeItem('cleaning_pending_sync');
       updateHeader(); initPersonSelect(); initTypeSelect(); refresh();
-      syncToSheets();
+      syncToSheets(true);
       showToast('✓ Backup wczytany i wysłany do chmury');
     } catch(err) {
       alert('Błąd wczytywania pliku: ' + err.message);
@@ -502,9 +526,9 @@ function importBackup(event) {
 }
 window.importBackup = importBackup;
 
-function forcePullFromCloud() {
+function forcePullFromCloud(silent) {
   if (!navigator.onLine) { setSyncStatus('offline'); return; }
-  if (!confirm('Pobrać dane z chmury? Lokalne niezapisane zmiany zostaną zastąpione.')) return;
+  if (!silent && !confirm('Pobrać dane z chmury? Lokalne niezapisane zmiany zostaną zastąpione.')) return;
   setSyncStatus('syncing');
   fetch(SYNC_URL + '?t=' + Date.now())
     .then(r => r.json())
@@ -521,7 +545,7 @@ function forcePullFromCloud() {
         lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
         setSyncStatus('ok');
         updateHeader(); initPersonSelect(); initTypeSelect(); refresh();
-        syncToSheets(); // wyslij z nowym timestampem zeby inne urzadzenia tez sie zgraly
+        syncToSheets(true); // wyslij z force (dane z chmury wiec nie pusto)
         showToast('✓ Pobrano dane z chmury');
       } else {
         setSyncStatus('ok');
