@@ -309,6 +309,8 @@ if ('serviceWorker' in navigator) {
       <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Automatyczny backup wysyłany co poniedziałek na email. Możesz też wywołać go ręcznie.</p>
       <button id="backup-now-btn" class="btn btn-secondary" style="width:100%">📦 Wyślij backup teraz</button>
       <div id="backup-status" style="font-size:12px;color:var(--text2);margin-top:8px;text-align:center"></div>
+      <button id="force-pull-btn" class="btn btn-secondary" style="width:100%;margin-top:10px">☁️⬇ Wymuś pobranie z chmury</button>
+      <p style="font-size:11px;color:var(--text3);margin-top:6px">Użyj gdy urządzenia mają różne dane — pobierze wersję z Google Sheets na wszystkie.</p>
     </div>
   </div>
 </div>
@@ -463,6 +465,36 @@ function syncToSheets() {
     isSaving = false;
   });
 }
+
+function forcePullFromCloud() {
+  if (!navigator.onLine) { setSyncStatus('offline'); return; }
+  if (!confirm('Pobrać dane z chmury? Lokalne niezapisane zmiany zostaną zastąpione.')) return;
+  setSyncStatus('syncing');
+  fetch(SYNC_URL + '?t=' + Date.now())
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.tasks) {
+        st = data;
+        if (!st.types || !Array.isArray(st.types) || !st.types.length) st.types = DEFAULT_TYPES;
+        if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
+        if (!st.logs || typeof st.logs !== 'object') st.logs = {};
+        st.date = today();
+        st.lastModified = Date.now(); // ustaw nowy timestamp by ten stan byl "wiodacy"
+        localStorage.setItem('cleaning_v4', JSON.stringify(st));
+        localStorage.removeItem('cleaning_pending_sync');
+        lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+        setSyncStatus('ok');
+        updateHeader(); initPersonSelect(); initTypeSelect(); refresh();
+        syncToSheets(); // wyslij z nowym timestampem zeby inne urzadzenia tez sie zgraly
+        showToast('✓ Pobrano dane z chmury');
+      } else {
+        setSyncStatus('ok');
+        showToast('Brak danych w chmurze');
+      }
+    })
+    .catch(() => setSyncStatus('error'));
+}
+window.forcePullFromCloud = forcePullFromCloud;
 
 function syncFromSheets(isAutoLoad) {
   if (!navigator.onLine) { setSyncStatus('offline'); return; }
@@ -1470,6 +1502,7 @@ document.getElementById('confirm-date').addEventListener('click', closeDateModal
 document.getElementById('add-task-btn').addEventListener('click', addTask);
 document.getElementById('add-type-btn').addEventListener('click', addType);
 document.getElementById('backup-now-btn').addEventListener('click', sendBackup);
+document.getElementById('force-pull-btn').addEventListener('click', forcePullFromCloud);
 document.getElementById('reclean-btn').addEventListener('click', toggleReClean);
 
 }); // end DOMContentLoaded
