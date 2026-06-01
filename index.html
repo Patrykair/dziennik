@@ -37,9 +37,9 @@ if ('serviceWorker' in navigator) {
     --text: #1a1814;
     --text2: #6b6560;
     --text3: #9e9890;
-    --accent: #1e5fa8;
-    --accent-light: #e7f0fa;
-    --accent-text: #14406f;
+    --accent: #2d6a4f;
+    --accent-light: #e8f5e9;
+    --accent-text: #1b4332;
     --danger: #c0392b;
     --danger-light: #fdf0ee;
     --warn: #b5622a;
@@ -487,22 +487,29 @@ function doSyncToSheets() {
   setSyncStatus('syncing');
   const payload = JSON.stringify(st);
   const myTimestamp = st.lastModified;
+  const myCount = Object.values(st.tasks||{}).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0);
+  // Wysylamy w trybie no-cors - POST zawsze dochodzi do Apps Script i zapisuje
   fetch(SYNC_URL, {
     method: 'POST',
+    mode: 'no-cors',
     body: payload,
-    headers: {'Content-Type': 'text/plain;charset=utf-8'},
-    redirect: 'follow'
+    headers: {'Content-Type': 'text/plain;charset=utf-8'}
   })
-  .then(r => r.text())
-  .then(txt => {
-    // Weryfikuj ze zapis sie powiodl - odpowiedz powinna zawierac OK
-    if (txt && txt.indexOf('OK') !== -1) {
+  .then(() => {
+    // Potwierdz zapis: pobierz z chmury i sprawdz czy timestamp sie zgadza
+    return fetch(SYNC_URL + '?t=' + Date.now()).then(r => r.json());
+  })
+  .then(cloud => {
+    const cloudTime = cloud && cloud.lastModified || 0;
+    const cloudCount = cloud && cloud.tasks ? Object.values(cloud.tasks).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0) : 0;
+    // Zapis potwierdzony jesli chmura ma nasz timestamp (lub nasza liczbe zadan)
+    if (cloudTime === myTimestamp || cloudCount >= myCount) {
       lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
       localStorage.removeItem('cleaning_pending_sync');
       setSyncStatus('ok');
       isSaving = false;
     } else {
-      // Zapis sie nie powiodl - oznacz jako oczekujacy
+      // Zapis nie potwierdzony - sprobuj ponownie za chwile
       localStorage.setItem('cleaning_pending_sync', 'true');
       setSyncStatus('error');
       isSaving = false;
