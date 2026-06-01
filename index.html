@@ -37,9 +37,9 @@ if ('serviceWorker' in navigator) {
     --text: #1a1814;
     --text2: #6b6560;
     --text3: #9e9890;
-    --accent: #2d6a4f;
-    --accent-light: #e8f5e9;
-    --accent-text: #1b4332;
+    --accent: #1e5fa8;
+    --accent-light: #e7f0fa;
+    --accent-text: #14406f;
     --danger: #c0392b;
     --danger-light: #fdf0ee;
     --warn: #b5622a;
@@ -387,6 +387,7 @@ const DEFAULT_TYPES = [
   {name:"Ensuite Bedroom", h:1.5},
   {name:"Non ensuite bedroom", h:0.5},
   {name:"Bathroom", h:1.0},
+  {name:"Corridor", h:0.5},
   {name:"Bedding", h:0.25},
   {name:"Studio", h:4.0},
   {name:"Kitchen", h:6.0},
@@ -428,7 +429,15 @@ function loadState() {
     data = {};
   }
   // Zapewnij wszystkie wymagane pola (odpornosc na uszkodzone/stare dane)
-  if (!data.types || !Array.isArray(data.types) || !data.types.length) data.types = DEFAULT_TYPES;
+  if (!data.types || !Array.isArray(data.types) || !data.types.length) {
+    data.types = DEFAULT_TYPES;
+  } else {
+    // Dodaj brakujace domyslne typy (np. nowo dodane w kodzie) bez ruszania istniejacych
+    const existingNames = new Set(data.types.map(t => t.name));
+    DEFAULT_TYPES.forEach(dt => {
+      if (!existingNames.has(dt.name)) data.types.push(dt);
+    });
+  }
   if (!data.tasks || typeof data.tasks !== 'object') data.tasks = {};
   if (!data.logs || typeof data.logs !== 'object') data.logs = {};
   if (!data.date) data.date = today();
@@ -508,7 +517,7 @@ function importBackup(event) {
       }
       if (!confirm('Wczytać dane z backupu? Obecne dane zostaną zastąpione.')) return;
       st = data;
-      if (!st.types || !Array.isArray(st.types) || !st.types.length) st.types = DEFAULT_TYPES;
+      if (!st.types || !Array.isArray(st.types) || !st.types.length) { st.types = DEFAULT_TYPES; } else { const _en = new Set(st.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!_en.has(dt.name)) st.types.push(dt); }); }
       if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
       if (!st.logs || typeof st.logs !== 'object') st.logs = {};
       st.date = today();
@@ -535,7 +544,7 @@ function forcePullFromCloud(silent) {
     .then(data => {
       if (data && data.tasks) {
         st = data;
-        if (!st.types || !Array.isArray(st.types) || !st.types.length) st.types = DEFAULT_TYPES;
+        if (!st.types || !Array.isArray(st.types) || !st.types.length) { st.types = DEFAULT_TYPES; } else { const _en = new Set(st.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!_en.has(dt.name)) st.types.push(dt); }); }
         if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
         if (!st.logs || typeof st.logs !== 'object') st.logs = {};
         st.date = today();
@@ -582,7 +591,7 @@ function syncFromSheets(isAutoLoad) {
       }
       // Chmura nowsza — pobierz
       st = data;
-      if (!st.types || !Array.isArray(st.types) || !st.types.length) st.types = DEFAULT_TYPES;
+      if (!st.types || !Array.isArray(st.types) || !st.types.length) { st.types = DEFAULT_TYPES; } else { const _en = new Set(st.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!_en.has(dt.name)) st.types.push(dt); }); }
       if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
       if (!st.logs || typeof st.logs !== 'object') st.logs = {};
       st.date = today();
@@ -778,6 +787,7 @@ function initTypeSelect() {
     'Sprawdzanie',
     'Non ensuite bedroom',
     'Bathroom',
+    'Corridor',
     'Bedding'
   ];
   // Posortuj typy wg kolejnosci, zachowujac oryginalne indeksy
