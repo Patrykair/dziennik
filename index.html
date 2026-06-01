@@ -1072,9 +1072,33 @@ function renderSummary() {
     totalTasks += pts.length;
 
     const noteText = pLog.note || '';
+    const COMBINED_DISP = {
+      'Kitchen + 4 Bedrooms': {Kitchen:1, 'Ensuite Bedroom':4},
+      'Kitchen + 5 Bedrooms': {Kitchen:1, 'Ensuite Bedroom':5},
+      'Kitchen + 6 Bedrooms': {Kitchen:1, 'Ensuite Bedroom':6},
+      'Large Kitchen + 6 Bedrooms': {'Large Kitchen':1, 'Ensuite Bedroom':6},
+      'Large Kitchen + 8 Bedrooms': {'Large Kitchen':1, 'Ensuite Bedroom':8},
+      'Large Kitchen + 10 Bedrooms': {'Large Kitchen':1, 'Ensuite Bedroom':10},
+    };
+    function fmtNum(n) {
+      if (Number.isInteger(n)) return n;
+      return Math.round(n*100)/100;
+    }
+    function taskDisplayName(t) {
+      const base = t.typeName.replace(/ 👥×\d+/,'').replace(' (re-clean)','').trim();
+      const reclean = t.typeName.includes('(re-clean)') ? ' (re-clean)' : '';
+      const mapping = COMBINED_DISP[base];
+      if (mapping && t.qty !== 1) {
+        // Rozbij na komponenty pomnozone przez qty
+        const parts = Object.entries(mapping).map(([part, n]) => `${fmtNum(n*t.qty)} ${part}`).join(' + ');
+        return parts + reclean;
+      }
+      // Zwykly typ lub qty=1
+      return (t.qty!==1?t.qty+'× ':'') + base + reclean;
+    }
     const taskLines = pts.map(t=>`
       <div class="sum-row">
-        <span style="color:var(--text2);flex:1">${t.qty!==1?t.qty+'× ':''}${t.typeName}${t.loc?' · '+t.loc:''}</span>
+        <span style="color:var(--text2);flex:1">${taskDisplayName(t)}${t.loc?' · '+t.loc:''}</span>
         <span style="margin-right:8px">${fh(t.h*t.qty)}</span>
         <button class="del-btn" data-date="${date}" data-id="${t.id}" data-gid="${t.groupId||''}" onclick="removeTask(this.dataset.date,+this.dataset.id,this.dataset.gid);renderSummary()">
           <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
