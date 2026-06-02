@@ -192,7 +192,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v49</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v50</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -486,22 +486,34 @@ function syncToSheets(force) {
 function doSyncToSheets() {
   setSyncStatus('syncing');
   const payload = JSON.stringify(st);
-  const myCount = Object.values(st.tasks||{}).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0);
-  // Zapis przez GET z danymi w parametrze (omija problem CORS z POST)
-  const saveUrl = SYNC_URL + '?action=save&t=' + Date.now() + '&data=' + encodeURIComponent(payload);
-  fetch(saveUrl)
-  .then(r => r.text())
-  .then(txt => {
-    if (txt && txt.indexOf('OK') !== -1) {
-      lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
-      localStorage.removeItem('cleaning_pending_sync');
-      setSyncStatus('ok');
-      isSaving = false;
-    } else {
-      setSyncStatus('error');
-      localStorage.setItem('cleaning_pending_sync', 'true');
-      isSaving = false;
-    }
+  // POST z text/plain nie wywoluje CORS preflight - Apps Script to przyjmuje
+  // no-cors gwarantuje dostarczenie (nie czytamy odpowiedzi, ale zapis dziala)
+  fetch(SYNC_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    body: payload,
+    headers: {'Content-Type': 'text/plain;charset=utf-8'}
+  })
+  .then(() => {
+    // no-cors nie pozwala odczytac odpowiedzi, wiec potwierdzamy przez pobranie
+    setTimeout(() => {
+      fetch(SYNC_URL + '?t=' + Date.now())
+        .then(r => r.json())
+        .then(cloud => {
+          const cloudCount = cloud && cloud.tasks ? Object.values(cloud.tasks).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0) : 0;
+          const myCount = Object.values(st.tasks||{}).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0);
+          if (cloudCount >= myCount) {
+            lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+            localStorage.removeItem('cleaning_pending_sync');
+            setSyncStatus('ok');
+          } else {
+            setSyncStatus('error');
+            localStorage.setItem('cleaning_pending_sync', 'true');
+          }
+          isSaving = false;
+        })
+        .catch(() => { setSyncStatus('ok'); isSaving = false; });
+    }, 1500);
   })
   .catch(() => {
     setSyncStatus('offline');
