@@ -192,7 +192,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik</div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v49</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -486,46 +486,27 @@ function syncToSheets(force) {
 function doSyncToSheets() {
   setSyncStatus('syncing');
   const payload = JSON.stringify(st);
-  fetch(SYNC_URL, {
-    method: 'POST',
-    body: payload,
-    headers: {'Content-Type': 'text/plain;charset=utf-8'},
-    redirect: 'follow'
-  })
+  const myCount = Object.values(st.tasks||{}).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0);
+  // Zapis przez GET z danymi w parametrze (omija problem CORS z POST)
+  const saveUrl = SYNC_URL + '?action=save&t=' + Date.now() + '&data=' + encodeURIComponent(payload);
+  fetch(saveUrl)
   .then(r => r.text())
   .then(txt => {
-    // Apps Script zwraca "OK" po udanym zapisie
     if (txt && txt.indexOf('OK') !== -1) {
       lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
       localStorage.removeItem('cleaning_pending_sync');
       setSyncStatus('ok');
-    } else {
-      // Nietypowa odpowiedz - ale zapis prawdopodobnie przeszedl, oznacz ok
-      lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
-      localStorage.removeItem('cleaning_pending_sync');
-      setSyncStatus('ok');
-    }
-    isSaving = false;
-  })
-  .catch(() => {
-    // Blad sieci LUB blad CORS przy redirect - sprobuj no-cors jako fallback
-    fetch(SYNC_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: payload,
-      headers: {'Content-Type': 'text/plain;charset=utf-8'}
-    })
-    .then(() => {
-      lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
-      localStorage.removeItem('cleaning_pending_sync');
-      setSyncStatus('ok');
       isSaving = false;
-    })
-    .catch(() => {
-      setSyncStatus('offline');
+    } else {
+      setSyncStatus('error');
       localStorage.setItem('cleaning_pending_sync', 'true');
       isSaving = false;
-    });
+    }
+  })
+  .catch(() => {
+    setSyncStatus('offline');
+    localStorage.setItem('cleaning_pending_sync', 'true');
+    isSaving = false;
   });
 }
 
