@@ -37,9 +37,9 @@ if ('serviceWorker' in navigator) {
     --text: #1a1814;
     --text2: #6b6560;
     --text3: #9e9890;
-    --accent: #2d6a4f;
-    --accent-light: #e8f5e9;
-    --accent-text: #1b4332;
+    --accent: #1e5fa8;
+    --accent-light: #e7f0fa;
+    --accent-text: #14406f;
     --danger: #c0392b;
     --danger-light: #fdf0ee;
     --warn: #b5622a;
@@ -583,74 +583,85 @@ function forcePullFromCloud(silent) {
 }
 window.forcePullFromCloud = forcePullFromCloud;
 
+function ensureFields(s) {
+  if (!s.types || !Array.isArray(s.types) || !s.types.length) { s.types = DEFAULT_TYPES; }
+  else { const en = new Set(s.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!en.has(dt.name)) s.types.push(dt); }); }
+  if (!s.tasks || typeof s.tasks !== 'object') s.tasks = {};
+  if (!s.logs || typeof s.logs !== 'object') s.logs = {};
+  return s;
+}
+
+// Scal dwa stany - laczy dni z obu stron, nie gubi zadnych danych
+function mergeStates(local, cloud) {
+  const merged = { types: local.types, tasks: {}, logs: {}, date: local.date, history: local.history || cloud.history || [] };
+  // Polacz listy usunietych ID z obu stron
+  const deletedIds = new Set([...(local.deletedIds||[]), ...(cloud.deletedIds||[])]);
+  merged.deletedIds = [...deletedIds];
+  // Zbierz wszystkie dni z obu zrodel
+  const allTaskDays = new Set([...Object.keys(local.tasks||{}), ...Object.keys(cloud.tasks||{})]);
+  allTaskDays.forEach(day => {
+    const localDay = (local.tasks||{})[day] || [];
+    const cloudDay = (cloud.tasks||{})[day] || [];
+    // Scal zadania po ID (unikalne), pomijajac usuniete
+    const byId = {};
+    [...cloudDay, ...localDay].forEach(t => { if (!deletedIds.has(t.id)) byId[t.id] = t; });
+    const mergedDay = Object.values(byId);
+    if (mergedDay.length) merged.tasks[day] = mergedDay;
+  });
+  // Scal logi - dla kazdego dnia i osoby wybierz nowszy/pelniejszy
+  const allLogDays = new Set([...Object.keys(local.logs||{}), ...Object.keys(cloud.logs||{})]);
+  allLogDays.forEach(day => {
+    const localDay = (local.logs||{})[day] || {};
+    const cloudDay = (cloud.logs||{})[day] || {};
+    merged.logs[day] = {};
+    const allPersons = new Set([...Object.keys(localDay), ...Object.keys(cloudDay)]);
+    allPersons.forEach(person => {
+      const lp = localDay[person] || {};
+      const cp = cloudDay[person] || {};
+      // Polacz pola - wybierz niezerowe/wieksze wartosci
+      merged.logs[day][person] = {
+        done: Object.assign({}, cp.done||{}, lp.done||{}),
+        note: lp.note || cp.note || '',
+        extra: Math.max(parseFloat(lp.extra)||0, parseFloat(cp.extra)||0),
+        system: Math.max(parseFloat(lp.system)||0, parseFloat(cp.system)||0),
+        driving: Math.max(parseFloat(lp.driving)||0, parseFloat(cp.driving)||0),
+        drivingReal: Math.max(parseFloat(lp.drivingReal)||0, parseFloat(cp.drivingReal)||0)
+      };
+    });
+  });
+  return ensureFields(merged);
+}
+
+function applyMergedState(merged) {
+  merged.date = today();
+  merged.lastModified = Date.now();
+  st = merged;
+  localStorage.setItem('cleaning_v4', JSON.stringify(st));
+  lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+  setSyncStatus('ok');
+  updateHeader(); initPersonSelect(); initTypeSelect(); refresh();
+}
+
 function syncFromSheets(isAutoLoad) {
   if (!navigator.onLine) { setSyncStatus('offline'); return; }
-  // Nie pobieraj podczas zapisywania lub gdy są niezapisane zmiany
   if (isSaving) { return; }
-  if (isAutoLoad && localStorage.getItem('cleaning_pending_sync')) {
-    setSyncStatus('ok');
-    syncToSheets();
-    return;
-  }
   if (!isAutoLoad) setSyncStatus('syncing');
-  // Anti-cache: dodaj timestamp do URL
   fetch(SYNC_URL + '?t=' + Date.now())
   .then(r => r.json())
   .then(data => {
-    if (isSaving) { setSyncStatus('ok'); return; } // zmiana w trakcie pobierania
+    if (isSaving) { setSyncStatus('ok'); return; }
     if (data && data.tasks) {
-      const cloudTime = data.lastModified || 0;
-      const localTime = st.lastModified || 0;
-      // Policz liczbe zadan po obu stronach
       const countTasks = obj => Object.values(obj.tasks||{}).reduce((s,arr)=>s+(Array.isArray(arr)?arr.length:0),0);
       const cloudCount = countTasks(data);
       const localCount = countTasks(st);
-
-      // OCHRONA PRZY STARCIE: jesli chmura ma wiecej danych niz lokalnie,
-      // zawsze pobierz z chmury (chroni przed nadpisaniem swiezym pustym stanem)
-      if (isAutoLoad && cloudCount > localCount) {
-        st = data;
-        if (!st.types || !Array.isArray(st.types) || !st.types.length) { st.types = DEFAULT_TYPES; } else { const _en = new Set(st.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!_en.has(dt.name)) st.types.push(dt); }); }
-        if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
-        if (!st.logs || typeof st.logs !== 'object') st.logs = {};
-        st.date = today();
-        localStorage.setItem('cleaning_v4', JSON.stringify(st));
-        lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
-        setSyncStatus('ok');
-        updateHeader(); initPersonSelect(); initTypeSelect(); refresh();
-        return;
+      // SCALANIE: polacz dane z chmury i lokalne - nic nie ginie
+      const merged = mergeStates(st, data);
+      const mergedCount = countTasks(merged);
+      applyMergedState(merged);
+      // Jesli scalony stan ma wiecej niz chmura, wyslij go z powrotem
+      if (mergedCount > cloudCount) {
+        syncToSheets(true);
       }
-      // OCHRONA: nie pozwol zeby pusty/ubozszy lokalny stan nadpisal bogatszą chmurę
-      if (cloudCount > localCount && localCount === 0) {
-        st = data;
-        if (!st.types || !Array.isArray(st.types) || !st.types.length) { st.types = DEFAULT_TYPES; } else { const _en = new Set(st.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!_en.has(dt.name)) st.types.push(dt); }); }
-        if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
-        if (!st.logs || typeof st.logs !== 'object') st.logs = {};
-        st.date = today();
-        localStorage.setItem('cleaning_v4', JSON.stringify(st));
-        setSyncStatus('ok');
-        updateHeader(); initPersonSelect(); initTypeSelect(); refresh();
-        return;
-      }
-      if (cloudTime <= localTime) {
-        // Lokalne nowsze lub identyczne — nie nadpisuj
-        setSyncStatus('ok');
-        if (cloudTime < localTime && localCount >= cloudCount) syncToSheets();
-        return;
-      }
-      // Chmura nowsza — pobierz
-      st = data;
-      if (!st.types || !Array.isArray(st.types) || !st.types.length) { st.types = DEFAULT_TYPES; } else { const _en = new Set(st.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!_en.has(dt.name)) st.types.push(dt); }); }
-      if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
-      if (!st.logs || typeof st.logs !== 'object') st.logs = {};
-      st.date = today();
-      localStorage.setItem('cleaning_v4', JSON.stringify(st));
-      lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
-      setSyncStatus('ok');
-      updateHeader();
-      initPersonSelect();
-      initTypeSelect();
-      refresh();
     } else {
       setSyncStatus('ok');
     }
@@ -1004,6 +1015,11 @@ function doRemoveTask() {
     st.tasks[date] = (st.tasks[date]||[]).filter(t=>t.id!==id);
   }
   const desc = removed.map(t=>`${t.typeName} (${t.person})`).join(', ');
+  // Zapisz usuniete ID (tombstones) zeby merge ich nie przywrocil
+  if (!st.deletedIds) st.deletedIds = [];
+  removed.forEach(t => { if (st.deletedIds.indexOf(t.id) === -1) st.deletedIds.push(t.id); });
+  // Trzymaj max 500 ostatnich
+  if (st.deletedIds.length > 500) st.deletedIds = st.deletedIds.slice(-500);
   logChange('Usunięto zadanie', desc || 'zadanie', snap);
   saveState();
   renderAssign();
