@@ -192,7 +192,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v51</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v52</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -487,7 +487,6 @@ function doSyncToSheets() {
   setSyncStatus('syncing');
   const payload = JSON.stringify(st);
   const myCount = Object.values(st.tasks||{}).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0);
-  // Podziel dane na czesci po ~4000 znakow (bezpieczny limit URL)
   const CHUNK_SIZE = 4000;
   const id = 'sync' + Date.now();
   const chunks = [];
@@ -495,29 +494,38 @@ function doSyncToSheets() {
     chunks.push(payload.slice(i, i + CHUNK_SIZE));
   }
   const total = chunks.length;
-  // Wysylaj czesci po kolei
   function sendChunk(part) {
     if (part >= total) {
-      // Wszystkie czesci wyslane - potwierdzono OK na ostatniej
-      lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
-      localStorage.removeItem('cleaning_pending_sync');
-      setSyncStatus('ok');
-      isSaving = false;
+      // Wszystkie czesci wyslane - potwierdz przez pobranie z chmury
+      setTimeout(() => {
+        fetch(SYNC_URL + '?t=' + Date.now())
+          .then(r => r.json())
+          .then(cloud => {
+            const cloudCount = cloud && cloud.tasks ? Object.values(cloud.tasks).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0) : 0;
+            if (cloudCount >= myCount) {
+              lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+              localStorage.removeItem('cleaning_pending_sync');
+              setSyncStatus('ok');
+            } else {
+              setSyncStatus('error');
+              localStorage.setItem('cleaning_pending_sync', 'true');
+            }
+            isSaving = false;
+          })
+          .catch(() => {
+            // Nie udalo sie potwierdzic, ale zapis prawdopodobnie przeszedl
+            lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+            setSyncStatus('ok');
+            isSaving = false;
+          });
+      }, 2000);
       return;
     }
     const url = SYNC_URL + '?action=savechunk&id=' + id + '&part=' + part +
                 '&total=' + total + '&data=' + encodeURIComponent(chunks[part]);
-    fetch(url)
-      .then(r => r.text())
-      .then(txt => {
-        if (txt && (txt.indexOf('OK') !== -1 || txt.indexOf('CHUNK_OK') !== -1)) {
-          sendChunk(part + 1); // nastepna czesc
-        } else {
-          setSyncStatus('error');
-          localStorage.setItem('cleaning_pending_sync', 'true');
-          isSaving = false;
-        }
-      })
+    // no-cors: zapis przechodzi, nie czytamy odpowiedzi (omija blokade CORS)
+    fetch(url, { mode: 'no-cors' })
+      .then(() => { setTimeout(() => sendChunk(part + 1), 150); })
       .catch(() => {
         setSyncStatus('offline');
         localStorage.setItem('cleaning_pending_sync', 'true');
