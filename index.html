@@ -192,7 +192,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v52</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v53</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -418,6 +418,7 @@ const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxwr16s4QGOu7ybvKPEmXM
 let syncTimeout = null;
 let lastSyncTime = null;
 let isSaving = false;
+let syncJustSent = false;
 
 function loadState() {
   let data;
@@ -496,28 +497,15 @@ function doSyncToSheets() {
   const total = chunks.length;
   function sendChunk(part) {
     if (part >= total) {
-      // Wszystkie czesci wyslane - potwierdz przez pobranie z chmury
+      // Wszystkie czesci wyslane - zapis przeszedl
+      // Po chwili pobierz i scal dane z chmury (dwukierunkowa sync)
       setTimeout(() => {
-        fetch(SYNC_URL + '?t=' + Date.now())
-          .then(r => r.json())
-          .then(cloud => {
-            const cloudCount = cloud && cloud.tasks ? Object.values(cloud.tasks).reduce((s,a)=>s+(Array.isArray(a)?a.length:0),0) : 0;
-            if (cloudCount >= myCount) {
-              lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
-              localStorage.removeItem('cleaning_pending_sync');
-              setSyncStatus('ok');
-            } else {
-              setSyncStatus('error');
-              localStorage.setItem('cleaning_pending_sync', 'true');
-            }
-            isSaving = false;
-          })
-          .catch(() => {
-            // Nie udalo sie potwierdzic, ale zapis prawdopodobnie przeszedl
-            lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
-            setSyncStatus('ok');
-            isSaving = false;
-          });
+        lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+        localStorage.removeItem('cleaning_pending_sync');
+        setSyncStatus('ok');
+        isSaving = false;
+        // Pobierz ewentualne zmiany z innych urzadzen i scal
+        syncFromSheets(false);
       }, 2000);
       return;
     }
@@ -671,8 +659,11 @@ function syncFromSheets(isAutoLoad) {
       const merged = mergeStates(st, data);
       const mergedCount = countTasks(merged);
       applyMergedState(merged);
-      // Jesli scalony stan ma wiecej niz chmura, wyslij go z powrotem
-      if (mergedCount > cloudCount) {
+      // Wyslij scalony stan do chmury TYLKO jesli ma wiecej niz chmura
+      // (czyli lokalnie bylo cos czego chmura nie ma) - i nie podczas zapisu
+      if (mergedCount > cloudCount && !isSaving && !syncJustSent) {
+        syncJustSent = true;
+        setTimeout(() => { syncJustSent = false; }, 5000);
         syncToSheets(true);
       }
     } else {
