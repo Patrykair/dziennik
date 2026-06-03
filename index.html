@@ -192,7 +192,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v57</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v58</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -485,7 +485,8 @@ function doSyncToSheets() {
     tasks: st.tasks,
     logs: st.logs,
     date: st.date,
-    lastModified: st.lastModified
+    lastModified: st.lastModified,
+    deletedIds: st.deletedIds || []
   };
   const payload = JSON.stringify(toSync);
   // Zapis przez POST no-cors - dane w tresci zadania, nie w URL
@@ -608,9 +609,13 @@ function mergeStates(local, cloud) {
     allPersons.forEach(person => {
       const lp = localDay[person] || {};
       const cp = cloudDay[person] || {};
-      // Polacz pola - wybierz niezerowe/wieksze wartosci
+      // Polacz "done" ale usun ID skasowanych zadan
+      const mergedDone = Object.assign({}, cp.done||{}, lp.done||{});
+      Object.keys(mergedDone).forEach(id => {
+        if (deletedIds.has(parseInt(id)) || deletedIds.has(id)) delete mergedDone[id];
+      });
       merged.logs[day][person] = {
-        done: Object.assign({}, cp.done||{}, lp.done||{}),
+        done: mergedDone,
         note: lp.note || cp.note || '',
         extra: Math.max(parseFloat(lp.extra)||0, parseFloat(cp.extra)||0),
         system: Math.max(parseFloat(lp.system)||0, parseFloat(cp.system)||0),
