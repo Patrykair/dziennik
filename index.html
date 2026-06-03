@@ -196,12 +196,15 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v60</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v63</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
       <button id="open-date-modal" class="date-btn">📅</button>
       <button id="day-next" class="date-btn" style="padding:6px 10px;font-size:16px">›</button>
+      <button id="hdr-week-prev" class="date-btn" style="padding:6px 10px;font-size:16px;display:none">‹</button>
+      <button id="hdr-week-label" class="date-btn" style="display:none">📆</button>
+      <button id="hdr-week-next" class="date-btn" style="padding:6px 10px;font-size:16px;display:none">›</button>
     </div>
   </div>
   <div style="display:flex;justify-content:space-between;align-items:center">
@@ -331,11 +334,7 @@ if ('serviceWorker' in navigator) {
 
 <!-- PAGE: TYDZIEN -->
 <div class="page" id="page-week">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:0 16px">
-    <button id="week-prev" class="btn btn-secondary" style="width:auto;padding:8px 14px">‹</button>
-    <div style="flex:1;text-align:center;font-size:13px;color:var(--text2)" id="week-range-label"></div>
-    <button id="week-next" class="btn btn-secondary" style="width:auto;padding:8px 14px">›</button>
-  </div>
+  <div style="text-align:center;font-size:13px;color:var(--text2);font-weight:600;margin-bottom:16px" id="week-range-label"></div>
   <div id="week-list-wrap"></div>
 </div>
 
@@ -737,6 +736,14 @@ function switchPage(page) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   document.getElementById('nav-'+page).classList.add('active');
+  // W zakladce Tydzien pokaz strzalki tygodnia zamiast strzalek dnia
+  const isWeek = page === 'week';
+  document.getElementById('day-prev').style.display = isWeek ? 'none' : '';
+  document.getElementById('open-date-modal').style.display = isWeek ? 'none' : '';
+  document.getElementById('day-next').style.display = isWeek ? 'none' : '';
+  document.getElementById('hdr-week-prev').style.display = isWeek ? '' : 'none';
+  document.getElementById('hdr-week-label').style.display = isWeek ? '' : 'none';
+  document.getElementById('hdr-week-next').style.display = isWeek ? '' : 'none';
   refresh();
 }
 
@@ -836,6 +843,8 @@ function getSelectedPersons() {
 }
 function initTypeSelect() {
   const s = document.getElementById('a-type');
+  // Zapamietaj aktualnie wybrany typ (zeby auto-sync go nie resetowal)
+  const prevName = s.value !== '' && st.types[s.value] ? st.types[s.value].name : null;
   // Kolejnosc wyswietlania wedlug preferencji uzytkownika
   const order = [
     'Ensuite Bedroom',
@@ -865,6 +874,11 @@ function initTypeSelect() {
   s.innerHTML = sorted.map(({type, idx}) =>
     `<option value="${idx}">${type.name}${type.custom ? '' : ' ('+type.h+'h)'}</option>`
   ).join('');
+  // Przywroc poprzednio wybrany typ jesli nadal istnieje
+  if (prevName) {
+    const restoreIdx = st.types.findIndex(t => t.name === prevName);
+    if (restoreIdx !== -1) s.value = restoreIdx;
+  }
   onTypeChange();
 }
 function onTypeChange() {
@@ -1043,6 +1057,7 @@ function removeType(i) {
   st.types.splice(i,1);
   saveState(); initTypeSelect(); renderTypesManage();
 }
+window.removeType = removeType;
 
 function renderAssign() {
   const date = st.date || today();
@@ -1593,8 +1608,9 @@ document.getElementById('confirm-modal').addEventListener('click', function(e) {
     this.classList.add('modal-hidden');
   }
 });
-document.getElementById('week-prev').addEventListener('click', () => shiftWeek(-1));
-document.getElementById('week-next').addEventListener('click', () => shiftWeek(1));
+document.getElementById('hdr-week-prev').addEventListener('click', () => shiftWeek(-1));
+document.getElementById('hdr-week-next').addEventListener('click', () => shiftWeek(1));
+document.getElementById('hdr-week-label').addEventListener('click', () => { weekOffset = 0; renderWeek(); });
 
 // Auto-sync on load
 syncFromSheets(true);
