@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v63</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v66</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -242,22 +242,15 @@ if ('serviceWorker' in navigator) {
     <div class="card-body">
       <div class="form-group">
         <label class="form-label">Pracownik</label>
-        <select id="a-person" onchange="renderCollabList();previewHours()" style="display:none"></select>
-        <button type="button" id="person-toggle" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);font-size:15px;font-family:var(--font-ui);cursor:pointer">
-          <span id="person-toggle-label">—</span>
-          <span style="color:var(--text3)">▾</span>
-        </button>
-        <div id="person-buttons" style="display:none;flex-direction:column;gap:6px;margin-top:6px;max-height:340px;overflow-y:auto"></div>
+        <select id="a-person" onchange="previewHours()" style="display:none"></select>
+        <div id="collab-hint" style="font-size:11px;color:var(--text3);margin-bottom:6px;display:none">Kliknij kilka osób, aby przydzielić wspólne zadanie</div>
+        <div id="person-buttons" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
       </div>
       <div class="form-group">
         <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
           <input type="checkbox" id="collab-toggle" onchange="toggleCollab()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
           Współpraca z innymi osobami
         </label>
-      </div>
-      <div id="collab-list-wrap" style="display:none;margin-bottom:12px">
-        <label class="form-label">Wybierz współpracowników</label>
-        <div id="collab-checklist" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);max-height:180px;overflow-y:auto;"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Typ zadania</label>
@@ -398,6 +391,7 @@ const DEFAULT_TYPES = [
 
 let st = loadState();
 let currentPage = 'assign';
+let selectedPersons = [];
 let reClean = false;
 
 function toggleReClean() {
@@ -755,91 +749,72 @@ function initPersonSelect() {
   const sel = document.getElementById('a-person');
   const btnWrap = document.getElementById('person-buttons');
 
-  // Hidden select - keep all persons as options for compatibility
-  const current = sel.value;
+  // Hidden select - utrzymywany dla zgodnosci (pierwsza zaznaczona osoba)
   sel.innerHTML = PERSONS.map(p=>`<option value="${p}">${p}</option>`).join('');
+  // Usun z zaznaczonych osoby ktore juz nie istnieja
+  selectedPersons = selectedPersons.filter(p => PERSONS.includes(p));
+  if (selectedPersons.length) sel.value = selectedPersons[0];
 
-  // Wybierz pierwsza osobe bez zadan jako domyslna
-  const firstFree = PERSONS.find(p => !assignedPersons.has(p));
-  if (!current || !PERSONS.includes(current)) {
-    sel.value = firstFree || PERSONS[0];
-  } else {
-    sel.value = current;
-  }
-
-  // Build button list
+  // Build compact grid chips (zawsze widoczne, 2 kolumny, multi-wybor)
   btnWrap.innerHTML = PERSONS.map(p => {
     const hasTask = assignedPersons.has(p);
-    const isSelected = p === sel.value;
-    const bg = hasTask ? '#d1f0dd' : (isSelected ? 'var(--accent)' : 'var(--bg)');
-    const color = isSelected && !hasTask ? '#fff' : 'var(--text)';
-    const border = isSelected ? 'var(--accent)' : 'var(--border)';
+    const selIdx = selectedPersons.indexOf(p);
+    const isSelected = selIdx !== -1;
+    const bg = isSelected ? 'var(--accent)' : (hasTask ? '#d1f0dd' : 'var(--surface)');
+    const color = isSelected ? '#fff' : (hasTask ? '#1b4332' : 'var(--text)');
+    const border = isSelected ? 'var(--accent-dark)' : (hasTask ? '#d4e3d6' : 'var(--border)');
     // Policz godziny pracy danej osoby na dzis
     const pTasks = tasks.filter(t => t.person === p);
     const pLog = logs[p] || {extra:0};
     const hoursToday = pTasks.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(pLog.extra)||0);
     const hoursLabel = hoursToday > 0 ? fh(hoursToday) : '';
+    const hColor = isSelected ? '#fff' : '#16a34a';
+    // Numerek przy zaznaczonych (gdy wiecej niz jedna)
+    const badge = (isSelected && selectedPersons.length > 1)
+      ? `<span style="background:#fff;color:var(--accent);width:16px;height:16px;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${selIdx+1}</span>` : '';
     return `<button type="button" class="person-btn" data-person="${escQ(p)}"
-      style="display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 12px;border:1.5px solid ${border};border-radius:var(--radius-sm);background:${bg};color:${color};font-size:14px;font-family:var(--font-ui);cursor:pointer">
-      <span style="flex:1">${p}${DRIVERS.includes(p)?' 🚗':''}</span>
-      <span style="font-size:13px;font-weight:600;color:${hasTask?'#16a34a':(isSelected?'#fff':'var(--text3)')}">${hoursLabel}</span>
+      style="display:flex;align-items:center;justify-content:space-between;gap:6px;text-align:left;padding:7px 10px;border:1.5px solid ${border};border-radius:8px;background:${bg};color:${color};font-size:12px;font-family:var(--font-ui);cursor:pointer">
+      <span style="display:flex;align-items:center;gap:5px;overflow:hidden">${badge}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p}${DRIVERS.includes(p)?' 🚗':''}</span></span>
+      ${hoursLabel?`<span style="font-size:11px;font-weight:600;color:${hColor};flex-shrink:0">${hoursLabel}</span>`:''}
     </button>`;
   }).join('');
 
-  // Click handlers
+  // Click handlers - toggle zaznaczenia
   btnWrap.querySelectorAll('.person-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      sel.value = btn.dataset.person;
-      btnWrap.style.display = 'none'; // zwin po wyborze
+      const p = btn.dataset.person;
+      const collabOn = document.getElementById('collab-toggle').checked;
+      if (collabOn) {
+        // Tryb wspolpracy - toggle wielu osob
+        const idx = selectedPersons.indexOf(p);
+        if (idx === -1) selectedPersons.push(p);
+        else selectedPersons.splice(idx, 1);
+      } else {
+        // Tryb pojedynczy - tylko jedna osoba
+        selectedPersons = [p];
+      }
+      if (selectedPersons.length) sel.value = selectedPersons[0];
       initPersonSelect();
-      renderCollabList();
       previewHours();
     });
   });
-
-  // Ustaw label na przycisku rozwijajacym
-  const toggleLabel = document.getElementById('person-toggle-label');
-  if (toggleLabel) {
-    const selPerson = sel.value;
-    const pTasks = tasks.filter(t => t.person === selPerson);
-    const pLog = logs[selPerson] || {extra:0};
-    const h = pTasks.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(pLog.extra)||0);
-    toggleLabel.textContent = selPerson + (DRIVERS.includes(selPerson)?' 🚗':'') + (h>0?'  ('+fh(h)+')':'');
-  }
-
-  renderCollabList();
 }
 
 function toggleCollab() {
   const on = document.getElementById('collab-toggle').checked;
-  document.getElementById('collab-list-wrap').style.display = on ? 'block' : 'none';
+  document.getElementById('collab-hint').style.display = on ? 'block' : 'none';
+  // Wychodzac z trybu wspolpracy - zostaw tylko glowna osobe
+  if (!on && selectedPersons.length > 1) {
+    selectedPersons = [selectedPersons[0]];
+    initPersonSelect();
+  }
   previewHours();
 }
-
-function renderCollabList() {
-  const date = st.date || today();
-  const logs = st.logs[date] || {};
-  const tasks = st.tasks[date] || [];
-  const assignedPersons = new Set(tasks.map(t => t.person));
-  const main = document.getElementById('a-person').value;
-  const el = document.getElementById('collab-checklist');
-  const others = PERSONS.filter(p => p !== main);
-  el.innerHTML = others.map(p=>{
-    const hasTask = assignedPersons.has(p);
-    return `<label class="person-check-item" style="${hasTask?'background:#d1f0dd;':''}">
-      <input type="checkbox" value="${escQ(p)}" onchange="previewHours()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
-      <div class="pci-avatar">${initials(p)}</div>
-      <span class="pcname">${p}${hasTask?' ✓':''}</span>
-    </label>`;
-  }).join('');
-}
+window.toggleCollab = toggleCollab;
 
 function getSelectedPersons() {
-  const main = document.getElementById('a-person').value;
-  const collabOn = document.getElementById('collab-toggle').checked;
-  if (!collabOn) return main ? [main] : [];
-  const others = [...document.querySelectorAll('#collab-checklist input:checked')].map(el=>el.value);
-  return [main, ...others].filter(p => p && p.trim());
+  // Zwroc zaznaczone osoby (pierwsza = glowna, reszta = wspolpraca)
+  return selectedPersons.filter(p => p && PERSONS.includes(p));
 }
 function initTypeSelect() {
   const s = document.getElementById('a-type');
@@ -944,9 +919,9 @@ function addTask() {
   document.getElementById('a-loc').value = '';
   document.getElementById('a-qty').value = 1;
   if (type.custom) document.getElementById('custom-hours').value = '';
+  selectedPersons = [];
   document.getElementById('collab-toggle').checked = false;
-  document.getElementById('collab-list-wrap').style.display = 'none';
-  document.querySelectorAll('#collab-checklist input').forEach(el=>{ el.checked=false; });
+  document.getElementById('collab-hint').style.display = 'none';
   logChange('Dodano zadanie', `${label} → ${persons.join(', ')}${loc?' (Flat: '+loc+')':''}`, snap);
 
   // BEDDING — automatycznie dolicz wg liczby pokoi
@@ -995,6 +970,7 @@ function addTask() {
   }
 
   saveState();
+  initPersonSelect();
   renderAssign();
   previewHours();
   showToast('✓ Zadanie dodane');
@@ -1552,10 +1528,8 @@ function resetTypes() {
 }
 window.resetTypes = resetTypes;
 window.toggleReClean = toggleReClean;
-window.toggleCollab = toggleCollab;
 window.onTypeChange = onTypeChange;
 window.previewHours = previewHours;
-window.renderCollabList = renderCollabList;
 window.openDateModal = openDateModal;
 window.closeDateModal = closeDateModal;
 window.setExtra = setExtra;
@@ -1592,10 +1566,6 @@ function sendBackup() {
 }
 window.sendBackup = sendBackup;
 
-document.getElementById('person-toggle').addEventListener('click', () => {
-  const bw = document.getElementById('person-buttons');
-  bw.style.display = bw.style.display === 'none' ? 'flex' : 'none';
-});
 document.getElementById('sync-btn').addEventListener('click', syncFromSheets);
 document.getElementById('confirm-ok-btn').addEventListener('click', doRemoveTask);
 document.getElementById('confirm-cancel-btn').addEventListener('click', () => {
