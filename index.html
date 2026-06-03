@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v66</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v71</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -237,8 +237,7 @@ if ('serviceWorker' in navigator) {
 <!-- PAGE: PRZYDZIEL -->
 <div class="page active" id="page-assign">
 
-  <div class="section-label">Dodaj zadanie</div>
-  <div class="card">
+  <div class="card" style="margin-top:4px">
     <div class="card-body">
       <div class="form-group">
         <label class="form-label">Pracownik</label>
@@ -256,10 +255,14 @@ if ('serviceWorker' in navigator) {
         <label class="form-label">Typ zadania</label>
         <select id="a-type" onchange="onTypeChange()"></select>
       </div>
-      <div class="form-group">
-        <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <div class="form-group" style="display:flex;gap:14px;flex-wrap:wrap">
+        <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
           <input type="checkbox" id="bedding-toggle" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
-          Bedding (dolicz wg liczby pokoi)
+          Bedding
+        </label>
+        <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
+          <input type="checkbox" id="reclean-toggle" onchange="toggleReClean()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
+          Re-clean (×0.5)
         </label>
       </div>
       <div class="form-group" id="custom-hours-row" style="display:none">
@@ -276,7 +279,6 @@ if ('serviceWorker' in navigator) {
           <input type="text" id="a-loc">
         </div>
       </div>
-      <button id="reclean-btn" class="btn btn-secondary" style="margin-bottom:12px;border:1.5px solid #c0392b;color:#c0392b;font-size:14px">🔄 Re-clean (godziny ×0.5)</button>
       <div class="preview-box">
         <span class="preview-label" id="a-preview-label">Godziny na osobę</span>
         <span class="preview-h" id="a-preview">—</span>
@@ -395,11 +397,7 @@ let selectedPersons = [];
 let reClean = false;
 
 function toggleReClean() {
-  reClean = !reClean;
-  const btn = document.getElementById('reclean-btn');
-  btn.style.background = reClean ? '#c0392b' : '';
-  btn.style.color = reClean ? '#fff' : '';
-  btn.textContent = reClean ? '🔄 Re-clean WŁĄCZONY (×0.5h)' : '🔄 Re-clean';
+  reClean = document.getElementById('reclean-toggle').checked;
   previewHours();
 }
 
@@ -876,8 +874,9 @@ function previewHours() {
   if (reClean) h = h / 2;
   const persons = getSelectedPersons();
   const count = persons.length || 1;
-  const perPerson = h / count;
-  const label = count > 1 ? `${fh(perPerson)} / os. (${count} osób, razem ${fh(h*qty)})` : fh(h * qty);
+  const totalH = h * qty;            // pelne godziny za cala ilosc
+  const perPerson = totalH / count;  // na osobe (z uwzglednieniem ilosci)
+  const label = count > 1 ? `${fh(perPerson)} / os. (${count} osób, razem ${fh(totalH)})` : fh(totalH);
   document.getElementById('a-preview').textContent = label;
 }
 
@@ -892,7 +891,7 @@ function addTask() {
   if (!type) return;
   let baseH = type.custom ? (parseFloat(document.getElementById('custom-hours').value)||0) : type.h;
   if (reClean) baseH = baseH / 2;
-  const perPersonH = baseH / persons.length;
+  const perPersonQty = qty / persons.length;
   const isGroup = persons.length > 1;
   const groupLabel = isGroup ? ` 👥×${persons.length}` : '';
   const label = (reClean ? type.name + ' (re-clean)' : type.name) + groupLabel;
@@ -906,8 +905,8 @@ function addTask() {
       id: taskId,
       person,
       typeName: label,
-      h: perPersonH,
-      qty,
+      h: baseH,
+      qty: perPersonQty,
       loc,
       groupWith: isGroup ? others : null,
       groupId
@@ -922,6 +921,8 @@ function addTask() {
   selectedPersons = [];
   document.getElementById('collab-toggle').checked = false;
   document.getElementById('collab-hint').style.display = 'none';
+  reClean = false;
+  document.getElementById('reclean-toggle').checked = false;
   logChange('Dodano zadanie', `${label} → ${persons.join(', ')}${loc?' (Flat: '+loc+')':''}`, snap);
 
   // BEDDING — automatycznie dolicz wg liczby pokoi
@@ -946,17 +947,16 @@ function addTask() {
       const beddingType = st.types.find(t => t.name === 'Bedding');
       const beddingH = beddingType ? beddingType.h : 0.25;
       const beddingGroupId = isGroup ? Date.now() + 500 + Math.random() * 100 | 0 : null;
+      const beddingPerPerson = beddingCount / persons.length;
       persons.forEach((person, i) => {
         const others = persons.filter(p=>p!==person);
         const bId = Date.now() + 1000 + i;
-        // h za 1 sztuke podzielone na liczbe osob
-        const hPerPersonPerUnit = beddingH / persons.length;
         st.tasks[date].push({
           id: bId,
           person,
           typeName: 'Bedding' + groupLabel,
-          h: hPerPersonPerUnit,
-          qty: beddingCount,
+          h: beddingH,
+          qty: beddingPerPerson,
           loc,
           groupWith: isGroup ? others : null,
           groupId: beddingGroupId
@@ -1189,24 +1189,26 @@ function renderSummary() {
   };
 
   const typeCounts = {};
-  const seenGroupIds = new Set();
   tasks.forEach(t => {
-    if (t.groupId && seenGroupIds.has(String(t.groupId))) return;
-    if (t.groupId) seenGroupIds.add(String(t.groupId));
+    // Zachowaj oznaczenie re-clean jako osobna pozycje, usun tylko etykiete grupy
+    const isReclean = t.typeName.includes('(re-clean)');
     const base = t.typeName.replace(/ 👥×\d+/,'').replace(' (re-clean)','').trim();
+    const suffix = isReclean ? ' (re-clean)' : '';
     const qty = t.qty || 1;
     const mapping = COMBINED_MAP[base];
     if (mapping) {
       Object.entries(mapping).forEach(([part, n]) => {
-        typeCounts[part] = (typeCounts[part]||0) + n * qty;
+        const key = part + suffix;
+        typeCounts[key] = (typeCounts[key]||0) + n * qty;
       });
     } else {
-      typeCounts[base] = (typeCounts[base]||0) + qty;
+      const key = base + suffix;
+      typeCounts[key] = (typeCounts[key]||0) + qty;
     }
   });
 
   const typeLines = Object.entries(typeCounts).map(([name,count])=>`
-    <div class="sum-row"><span style="color:var(--text2)">${name}</span><span>×${count}</span></div>`).join('');
+    <div class="sum-row"><span style="color:var(--text2)">${name}</span><span>×${Math.round(count*100)/100}</span></div>`).join('');
   mWrap.innerHTML = `<div class="card" style="grid-column:1/-1;margin-bottom:0">
     <div class="card-body" style="padding:12px 16px">
       <div class="section-label" style="margin-top:0;margin-bottom:8px">Suma zadań zespołu</div>
@@ -1387,21 +1389,18 @@ function renderWeek() {
       }
       const typeAgg = {};
       pts.forEach(t => {
+        const isReclean = t.typeName.includes('(re-clean)');
         const baseName = t.typeName.replace(/ 👥×\d+/,'').replace(' (re-clean)','').trim();
-        const groupSize = (t.groupWith && Array.isArray(t.groupWith) && t.groupWith.length > 0) ? t.groupWith.length + 1 : 1;
+        const suffix = isReclean ? ' (re-clean)' : '';
         const mapping = COMBINED_MAP_WEEK[baseName];
-        if (mapping && groupSize > 1) {
-          // Rozloz na komponenty podzielone przez grupowosc
+        if (mapping) {
           Object.entries(mapping).forEach(([part, n]) => {
-            typeAgg[part] = (typeAgg[part] || 0) + (n * (t.qty||1)) / groupSize;
-          });
-        } else if (mapping) {
-          Object.entries(mapping).forEach(([part, n]) => {
-            typeAgg[part] = (typeAgg[part] || 0) + n * (t.qty||1);
+            const key = part + suffix;
+            typeAgg[key] = (typeAgg[key] || 0) + n * (t.qty||1);
           });
         } else {
-          const effectiveQty = (t.qty||1) / groupSize;
-          typeAgg[baseName] = (typeAgg[baseName] || 0) + effectiveQty;
+          const key = baseName + suffix;
+          typeAgg[key] = (typeAgg[key] || 0) + (t.qty||1);
         }
       });
       const taskNames = Object.entries(typeAgg).map(([name, total]) => {
@@ -1607,7 +1606,6 @@ document.getElementById('add-type-btn').addEventListener('click', addType);
 document.getElementById('backup-now-btn').addEventListener('click', sendBackup);
 document.getElementById('force-pull-btn').addEventListener('click', forcePullFromCloud);
 document.getElementById('import-backup-input').addEventListener('change', importBackup);
-document.getElementById('reclean-btn').addEventListener('click', toggleReClean);
 
 }); // end DOMContentLoaded
 </script>
