@@ -30,20 +30,23 @@ if ('serviceWorker' in navigator) {
 </script>
 <style>
   :root {
-    --bg: #f5f4f0;
+    --bg: #f3f7f3;
     --surface: #ffffff;
-    --surface2: #f0ede8;
-    --border: #e0dbd4;
-    --text: #1a1814;
-    --text2: #6b6560;
-    --text3: #9e9890;
+    --surface2: #e9f2ea;
+    --border: #d4e3d6;
+    --text: #1b2e22;
+    --text2: #5a6f60;
+    --text3: #93a395;
     --accent: #2d6a4f;
-    --accent-light: #e8f5e9;
+    --accent-dark: #1b4332;
+    --accent-light: #d8f3dc;
     --accent-text: #1b4332;
+    --accent-bright: #52b788;
     --danger: #c0392b;
     --danger-light: #fdf0ee;
-    --warn: #b5622a;
-    --warn-light: #fdf3ee;
+    --warn: #d68910;
+    --warn-light: #fdf6e8;
+    --header-bg: #1b4332;
     --radius: 14px;
     --radius-sm: 8px;
     --font: 'Georgia', serif;
@@ -53,13 +56,13 @@ if ('serviceWorker' in navigator) {
   body { font-family: var(--font-ui); background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 80px; }
 
   /* HEADER */
-  .header { background: var(--text); color: #fff; padding: 16px 20px 14px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .header { background: var(--header-bg); color: #fff; padding: 16px 20px 14px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(27,67,50,.12); }
   .header-title { font-family: var(--font); font-size: 19px; font-weight: normal; letter-spacing: -.3px; }
   .header-date { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 2px; }
   .date-btn { background: rgba(255,255,255,.12); border: none; color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 13px; cursor: pointer; font-family: var(--font-ui); }
 
   /* BOTTOM NAV */
-  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; z-index: 100; }
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; z-index: 100; box-shadow: 0 -2px 10px rgba(27,67,50,.06); }
   .nav-btn { flex: 1; padding: 10px 4px 12px; border: none; background: transparent; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text3); font-size: 9px; font-family: var(--font-ui); transition: color .15s; }
   .nav-btn.active { color: var(--accent); }
   .nav-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -73,14 +76,14 @@ if ('serviceWorker' in navigator) {
   .section-label:first-child { margin-top: 0; }
 
   /* CARDS */
-  .card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 10px; overflow: hidden; }
+  .card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(27,67,50,.05); }
   .card-body { padding: 14px 16px; }
   .card-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
 
   /* PERSON CARD */
-  .person-card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 10px; }
+  .person-card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 10px; box-shadow: 0 1px 3px rgba(27,67,50,.05); }
   .person-top { padding: 12px 14px; display: flex; align-items: center; gap: 10px; }
-  .avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--accent-light); color: var(--accent-text); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; letter-spacing: -.5px; }
+  .avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; letter-spacing: -.5px; }
   .person-name { font-size: 15px; font-weight: 600; flex: 1; }
   .hours-pill { background: var(--accent-light); color: var(--accent-text); font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
 
@@ -111,7 +114,8 @@ if ('serviceWorker' in navigator) {
 
   /* BUTTONS */
   .btn { padding: 13px 20px; border-radius: var(--radius-sm); border: none; font-size: 15px; font-weight: 600; cursor: pointer; font-family: var(--font-ui); width: 100%; }
-  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgba(45,106,79,.25); }
+  .btn-primary:active { background: var(--accent-dark); }
   .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
   .btn-sm { width: auto; padding: 7px 14px; font-size: 13px; }
   .btn-danger-sm { background: var(--danger-light); color: var(--danger); border: 1px solid #f5c9c4; width: auto; padding: 7px 14px; font-size: 13px; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font-ui); font-weight: 600; }
@@ -192,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v58</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v60</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -628,7 +632,9 @@ function mergeStates(local, cloud) {
 }
 
 function applyMergedState(merged) {
-  merged.date = today();
+  // Zachowaj aktualnie przegladana date (zeby auto-sync nie przeskakiwal na dzis)
+  const viewedDate = st.date || today();
+  merged.date = viewedDate;
   merged.lastModified = Date.now();
   st = merged;
   localStorage.setItem('cleaning_v4', JSON.stringify(st));
