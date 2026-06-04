@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v71</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v78</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -235,12 +235,11 @@ if ('serviceWorker' in navigator) {
 </div>
 
 <!-- PAGE: PRZYDZIEL -->
-<div class="page active" id="page-assign">
+<div class="page active" id="page-assign" style="padding-top:8px">
 
-  <div class="card" style="margin-top:4px">
+  <div class="card" style="margin-top:0">
     <div class="card-body">
       <div class="form-group">
-        <label class="form-label">Pracownik</label>
         <select id="a-person" onchange="previewHours()" style="display:none"></select>
         <div id="collab-hint" style="font-size:11px;color:var(--text3);margin-bottom:6px;display:none">Kliknij kilka osób, aby przydzielić wspólne zadanie</div>
         <div id="person-buttons" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
@@ -257,8 +256,12 @@ if ('serviceWorker' in navigator) {
       </div>
       <div class="form-group" style="display:flex;gap:14px;flex-wrap:wrap">
         <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
-          <input type="checkbox" id="bedding-toggle" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
+          <input type="checkbox" id="bedding-toggle" onchange="previewHours()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
           Bedding
+        </label>
+        <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
+          <input type="checkbox" id="corridor-toggle" onchange="previewHours()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
+          Corridor
         </label>
         <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
           <input type="checkbox" id="reclean-toggle" onchange="toggleReClean()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
@@ -874,8 +877,33 @@ function previewHours() {
   if (reClean) h = h / 2;
   const persons = getSelectedPersons();
   const count = persons.length || 1;
-  const totalH = h * qty;            // pelne godziny za cala ilosc
-  const perPerson = totalH / count;  // na osobe (z uwzglednieniem ilosci)
+  let totalH = h * qty;  // glowne zadanie
+
+  // Dolicz Bedding jesli zaznaczony (bedding zawsze 0.25, bez re-clean)
+  const beddingOn = document.getElementById('bedding-toggle') && document.getElementById('bedding-toggle').checked;
+  if (beddingOn) {
+    const ROOMS = {'Kitchen + 4 Bedrooms':4,'Kitchen + 5 Bedrooms':5,'Kitchen + 6 Bedrooms':6,
+      'Large Kitchen + 6 Bedrooms':6,'Large Kitchen + 8 Bedrooms':8,'Large Kitchen + 10 Bedrooms':10};
+    let bCount = 0;
+    if (ROOMS[type.name]) bCount = ROOMS[type.name] * qty;
+    else if (type.name==='Ensuite Bedroom'||type.name==='Non ensuite bedroom'||type.name==='Studio') bCount = qty;
+    const bType = st.types.find(t=>t.name==='Bedding');
+    totalH += bCount * (bType ? bType.h : 0.25);
+  }
+
+  // Dolicz Corridor jesli zaznaczony (wg liczby kuchni, re-clean dzieli na pol)
+  const corridorOn = document.getElementById('corridor-toggle') && document.getElementById('corridor-toggle').checked;
+  if (corridorOn) {
+    const KITCHENS = {'Kitchen':1,'Large Kitchen':1,'Kitchen + 4 Bedrooms':1,'Kitchen + 5 Bedrooms':1,
+      'Kitchen + 6 Bedrooms':1,'Large Kitchen + 6 Bedrooms':1,'Large Kitchen + 8 Bedrooms':1,'Large Kitchen + 10 Bedrooms':1};
+    const kCount = (KITCHENS[type.name]||0) * qty;
+    const cType = st.types.find(t=>t.name==='Corridor');
+    let cH = cType ? cType.h : 0.5;
+    if (reClean) cH = cH / 2;
+    totalH += kCount * cH;
+  }
+
+  const perPerson = totalH / count;
   const label = count > 1 ? `${fh(perPerson)} / os. (${count} osób, razem ${fh(totalH)})` : fh(totalH);
   document.getElementById('a-preview').textContent = label;
 }
@@ -889,12 +917,13 @@ function addTask() {
   const loc = document.getElementById('a-loc').value.trim();
   const type = st.types[idx];
   if (!type) return;
+  const isReclean = reClean; // zapamietaj stan PRZED resetem (uzywane w bedding/corridor)
   let baseH = type.custom ? (parseFloat(document.getElementById('custom-hours').value)||0) : type.h;
-  if (reClean) baseH = baseH / 2;
+  if (isReclean) baseH = baseH / 2;
   const perPersonQty = qty / persons.length;
   const isGroup = persons.length > 1;
   const groupLabel = isGroup ? ` 👥×${persons.length}` : '';
-  const label = (reClean ? type.name + ' (re-clean)' : type.name) + groupLabel;
+  const label = (isReclean ? type.name + ' (re-clean)' : type.name) + groupLabel;
   const groupId = isGroup ? Date.now() : null;
   if (!st.tasks[date]) st.tasks[date] = [];
   const snap = {tasks: JSON.parse(JSON.stringify(st.tasks)), logs: JSON.parse(JSON.stringify(st.logs))};
@@ -967,6 +996,44 @@ function addTask() {
       logChange('Dodano zadanie', `Bedding ×${beddingCount} → ${persons.join(', ')}`, snap);
     }
     beddingToggle.checked = false;
+  }
+
+  // CORRIDOR — automatycznie dolicz wg liczby kuchni
+  const corridorToggle = document.getElementById('corridor-toggle');
+  if (corridorToggle && corridorToggle.checked) {
+    // Ile kuchni ma kazdy typ (typy zawierajace kuchnie = 1 kuchnia)
+    const KITCHENS_IN_TYPE = {
+      'Kitchen': 1, 'Large Kitchen': 1,
+      'Kitchen + 4 Bedrooms': 1, 'Kitchen + 5 Bedrooms': 1, 'Kitchen + 6 Bedrooms': 1,
+      'Large Kitchen + 6 Bedrooms': 1, 'Large Kitchen + 8 Bedrooms': 1, 'Large Kitchen + 10 Bedrooms': 1
+    };
+    const kitchenCount = (KITCHENS_IN_TYPE[type.name] || 0) * qty;
+    if (kitchenCount > 0) {
+      const corridorType = st.types.find(t => t.name === 'Corridor');
+      let corridorH = corridorType ? corridorType.h : 0.5;
+      if (isReclean) corridorH = corridorH / 2;
+      const corridorGroupId = isGroup ? Date.now() + 700 + Math.random() * 100 | 0 : null;
+      const corridorPerPerson = kitchenCount / persons.length;
+      const corridorLabel = (isReclean ? 'Corridor (re-clean)' : 'Corridor') + groupLabel;
+      persons.forEach((person, i) => {
+        const others = persons.filter(p=>p!==person);
+        const cId = Date.now() + 2000 + i;
+        st.tasks[date].push({
+          id: cId,
+          person,
+          typeName: corridorLabel,
+          h: corridorH,
+          qty: corridorPerPerson,
+          loc,
+          groupWith: isGroup ? others : null,
+          groupId: corridorGroupId
+        });
+        if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0};
+        st.logs[date][person].done[cId] = true;
+      });
+      logChange('Dodano zadanie', `Corridor ×${kitchenCount} → ${persons.join(', ')}`, snap);
+    }
+    corridorToggle.checked = false;
   }
 
   saveState();
