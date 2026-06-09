@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v79</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v80</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -378,11 +378,15 @@ const PERSONS = [
 const DEFAULT_TYPES = [
   {name:"Ensuite Bedroom", h:1.5},
   {name:"Non ensuite bedroom", h:0.5},
+  {name:"Twin En-Suite", h:1.75},
+  {name:"Twin non en-suite", h:0.75},
   {name:"Bathroom", h:1.0},
-  {name:"Corridor", h:0.5},
+  {name:"Corridor", h:0.25},
+  {name:"Staircase", h:1.0},
   {name:"Bedding", h:0.25},
   {name:"Studio", h:4.0},
   {name:"Kitchen", h:6.0},
+  {name:"Kitchen (z lodówką)", h:7.0},
   {name:"Large Kitchen", h:8.0},
   {name:"Kitchen + 4 Bedrooms", h:12.0},
   {name:"Kitchen + 5 Bedrooms", h:13.5},
@@ -428,6 +432,9 @@ function loadState() {
       if (!existingNames.has(dt.name)) data.types.push(dt);
     });
   }
+  // Migracja: Corridor zmieniony z 0.5h na 0.25h
+  const corr = data.types.find(t => t.name === 'Corridor');
+  if (corr && corr.h === 0.5) corr.h = 0.25;
   if (!data.tasks || typeof data.tasks !== 'object') data.tasks = {};
   if (!data.logs || typeof data.logs !== 'object') data.logs = {};
   if (!data.date) data.date = today();
@@ -574,6 +581,9 @@ window.forcePullFromCloud = forcePullFromCloud;
 function ensureFields(s) {
   if (!s.types || !Array.isArray(s.types) || !s.types.length) { s.types = DEFAULT_TYPES; }
   else { const en = new Set(s.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!en.has(dt.name)) s.types.push(dt); }); }
+  // Migracja: Corridor zmieniony z 0.5h na 0.25h
+  const corr = s.types.find(t => t.name === 'Corridor');
+  if (corr && corr.h === 0.5) corr.h = 0.25;
   if (!s.tasks || typeof s.tasks !== 'object') s.tasks = {};
   if (!s.logs || typeof s.logs !== 'object') s.logs = {};
   return s;
@@ -823,7 +833,9 @@ function initTypeSelect() {
   // Kolejnosc wyswietlania wedlug preferencji uzytkownika
   const order = [
     'Ensuite Bedroom',
+    'Twin En-Suite',
     'Kitchen',
+    'Kitchen (z lodówką)',
     'Large Kitchen',
     'Kitchen + 4 Bedrooms',
     'Kitchen + 5 Bedrooms',
@@ -834,8 +846,10 @@ function initTypeSelect() {
     'Studio',
     'Sprawdzanie',
     'Non ensuite bedroom',
+    'Twin non en-suite',
     'Bathroom',
     'Corridor',
+    'Staircase',
     'Bedding'
   ];
   // Posortuj typy wg kolejnosci, zachowujac oryginalne indeksy
@@ -885,6 +899,7 @@ function previewHours() {
       'Large Kitchen + 6 Bedrooms':6,'Large Kitchen + 8 Bedrooms':8,'Large Kitchen + 10 Bedrooms':10};
     let bCount = 0;
     if (ROOMS[type.name]) bCount = ROOMS[type.name] * qty;
+    else if (type.name==='Twin En-Suite'||type.name==='Twin non en-suite') bCount = 2 * qty;
     else if (type.name==='Ensuite Bedroom'||type.name==='Non ensuite bedroom'||type.name==='Studio') bCount = qty;
     const bType = st.types.find(t=>t.name==='Bedding');
     totalH += bCount * (bType ? bType.h : 0.25);
@@ -893,7 +908,7 @@ function previewHours() {
   // Dolicz Corridor jesli zaznaczony (wg liczby kuchni, re-clean dzieli na pol)
   const corridorOn = document.getElementById('corridor-toggle') && document.getElementById('corridor-toggle').checked;
   if (corridorOn) {
-    const KITCHENS = {'Kitchen':1,'Large Kitchen':1,'Kitchen + 4 Bedrooms':1,'Kitchen + 5 Bedrooms':1,
+    const KITCHENS = {'Kitchen':1,'Kitchen (z lodówką)':1,'Large Kitchen':1,'Kitchen + 4 Bedrooms':1,'Kitchen + 5 Bedrooms':1,
       'Kitchen + 6 Bedrooms':1,'Large Kitchen + 6 Bedrooms':1,'Large Kitchen + 8 Bedrooms':1,'Large Kitchen + 10 Bedrooms':1};
     const kCount = (KITCHENS[type.name]||0) * qty;
     const cType = st.types.find(t=>t.name==='Corridor');
@@ -961,10 +976,12 @@ function addTask() {
       'Kitchen + 4 Bedrooms': 4, 'Kitchen + 5 Bedrooms': 5, 'Kitchen + 6 Bedrooms': 6,
       'Large Kitchen + 6 Bedrooms': 6, 'Large Kitchen + 8 Bedrooms': 8, 'Large Kitchen + 10 Bedrooms': 10
     };
-    // Ile beddingow: dla typow z pokojami = liczba pokoi x qty, dla Ensuite = qty
+    // Ile beddingow: typy z pokojami = liczba pokoi x qty, Twin = 2 lozka x qty, reszta = qty
     let beddingCount = 0;
     if (ROOMS_IN_TYPE[type.name]) {
       beddingCount = ROOMS_IN_TYPE[type.name] * qty;
+    } else if (type.name === 'Twin En-Suite' || type.name === 'Twin non en-suite') {
+      beddingCount = 2 * qty; // twin = 2 lozka = 2 beddingi
     } else if (type.name === 'Ensuite Bedroom' || type.name === 'Non ensuite bedroom') {
       beddingCount = qty;
     } else if (type.name === 'Studio') {
@@ -1002,7 +1019,7 @@ function addTask() {
   if (corridorToggle && corridorToggle.checked) {
     // Ile kuchni ma kazdy typ (typy zawierajace kuchnie = 1 kuchnia)
     const KITCHENS_IN_TYPE = {
-      'Kitchen': 1, 'Large Kitchen': 1,
+      'Kitchen': 1, 'Kitchen (z lodówką)': 1, 'Large Kitchen': 1,
       'Kitchen + 4 Bedrooms': 1, 'Kitchen + 5 Bedrooms': 1, 'Kitchen + 6 Bedrooms': 1,
       'Large Kitchen + 6 Bedrooms': 1, 'Large Kitchen + 8 Bedrooms': 1, 'Large Kitchen + 10 Bedrooms': 1
     };
