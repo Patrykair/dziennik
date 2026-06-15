@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v84</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v85</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -957,7 +957,9 @@ function addTask() {
   document.getElementById('a-loc').value = '';
   document.getElementById('a-qty').value = 1;
   if (type.custom) document.getElementById('custom-hours').value = '';
-  selectedPersons = [];
+  // Przy wlaczonej wspolpracy zostaw zaznaczone osoby (latwiej dodac kolejne wspolne zadanie)
+  const collabStillOn = document.getElementById('collab-toggle').checked;
+  if (!collabStillOn) selectedPersons = [];
   reClean = false;
   document.getElementById('reclean-toggle').checked = false;
   logChange('Dodano zadanie', `${label} → ${persons.join(', ')}${loc?' (Flat: '+loc+')':''}`, snap);
