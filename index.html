@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v82</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v84</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -371,9 +371,8 @@ if ('serviceWorker' in navigator) {
 <script>
 window.addEventListener('DOMContentLoaded', function() {
 const PERSONS = [
-  "Ania Orzechowska","Damian Fąs","Ela Golińska","Gabriela Wystalska","Iwona Kuś",
-  "Julia Stajer","Kacper Znoro Znorko","Nikola Jachimkowska","Patryk Szymborski",
-  "Paulina Kopcińska","Paweł Puziak"
+  "Paweł Puziak","Julia Stajer","Ania Orzechowska","Kacper Znoro Znorko","Damian Fąs",
+  "Nikola Jachimkowska","Ela Golińska","Gabriela Wystalska","Iwona Kuś","Paulina Kopcińska"
 ];
 
 const DEFAULT_TYPES = [
@@ -384,6 +383,7 @@ const DEFAULT_TYPES = [
   {name:"Bathroom", h:1.0},
   {name:"Corridor", h:0.5},
   {name:"Staircase", h:0.25},
+  {name:"Śmieci", h:1.0},
   {name:"Bedding", h:0.25},
   {name:"Studio", h:4.0},
   {name:"Kitchen", h:6.0},
@@ -845,6 +845,7 @@ function initTypeSelect() {
     'Bathroom',
     'Corridor',
     'Staircase',
+    'Śmieci',
     'Bedding'
   ];
   // Posortuj typy wg kolejnosci, zachowujac oryginalne indeksy
@@ -957,8 +958,6 @@ function addTask() {
   document.getElementById('a-qty').value = 1;
   if (type.custom) document.getElementById('custom-hours').value = '';
   selectedPersons = [];
-  document.getElementById('collab-toggle').checked = false;
-  document.getElementById('collab-hint').style.display = 'none';
   reClean = false;
   document.getElementById('reclean-toggle').checked = false;
   logChange('Dodano zadanie', `${label} → ${persons.join(', ')}${loc?' (Flat: '+loc+')':''}`, snap);
@@ -1296,7 +1295,7 @@ function renderSummary() {
   sWrap.innerHTML = '<div class="section-label">Szczegóły według pracownika</div>' + cards;
 }
 
-const DRIVERS = ['Patryk Szymborski','Paweł Puziak'];
+const DRIVERS = ['Paweł Puziak'];
 
 function renderHours() {
   const date = st.date || today();
