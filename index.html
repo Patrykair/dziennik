@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v89</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v91</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -372,7 +372,7 @@ if ('serviceWorker' in navigator) {
 window.addEventListener('DOMContentLoaded', function() {
 const PERSONS = [
   "Maciej Skrouba","Natalia Laszewska","Aleksandra Wysocka","Bartosz Wolner","Wiktoria Wojciechowska",
-  "Kamil Gumieniak","Ewa Hejmo","Ive Massani","Krystian Markiewicz","Piotr Czaja","Jaro"
+  "Kamil Gumieniak","Ewa Hejmo","Ive Massani","Krystian Markiewicz","Piotr Czaja"
 ];
 
 const DEFAULT_TYPES = [
@@ -1219,7 +1219,10 @@ function renderSummary() {
   tasks.forEach(t=>{ if(!byPerson[t.person]) byPerson[t.person]=[]; byPerson[t.person].push(t); });
 
   let totalH=0, totalTasks=0;
-  const cards = Object.entries(byPerson).map(([person, pts])=>{
+  // Sortuj osoby alfabetycznie po imieniu (polskie znaki)
+  const sortedPersons = Object.keys(byPerson).sort((a,b)=>a.localeCompare(b,'pl'));
+  const cards = sortedPersons.map(person=>{
+    const pts = byPerson[person];
     const pLog = logs[person]||{done:{},note:'',extra:0};
     const doneH = pts.reduce((s,t)=>s+t.h*t.qty,0);
     const extra = parseFloat(pLog.extra)||0;
@@ -1323,7 +1326,7 @@ function renderHours() {
   const wrap = document.getElementById('hours-list-wrap');
 
   wrap.innerHTML = '<div class="section-label" style="margin-top:0">Bilans dzienny — ' + formatDate(date) + '</div>' +
-    PERSONS.map(person => {
+    [...PERSONS].sort((a,b)=>a.localeCompare(b,'pl')).map(person => {
       const pLog = logs[person]||{done:{},note:'',extra:0,system:0,driving:0,drivingReal:0};
       const pts = tasks.filter(t=>t.person===person);
       const earnedH = pts.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(pLog.extra)||0);
