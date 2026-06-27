@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v91</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v94</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -231,6 +231,37 @@ if ('serviceWorker' in navigator) {
     <h3>Wybierz datę</h3>
     <input type="date" id="global-date-input" style="margin-bottom:16px" onchange="closeDateModal()">
     <button id="confirm-date" class="btn btn-primary">Potwierdź</button>
+  </div>
+</div>
+
+<!-- EDIT TASK MODAL -->
+<div class="modal-overlay modal-hidden" id="edit-modal">
+  <div class="modal">
+    <h3>Edytuj zadanie</h3>
+    <div class="form-group">
+      <label class="form-label">Osoba</label>
+      <select id="edit-person"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Typ zadania</label>
+      <select id="edit-type" onchange="onEditTypeChange()"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Opis / Flat</label>
+      <input type="text" id="edit-loc" placeholder="np. numer flat">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Ilość</label>
+      <input type="number" id="edit-qty" step="0.1" min="0" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Godziny (za sztukę)</label>
+      <input type="number" id="edit-hours" step="0.05" min="0" inputmode="decimal">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button id="edit-cancel-btn" class="btn btn-secondary" style="flex:1">Anuluj</button>
+      <button id="edit-save-btn" class="btn btn-primary" style="flex:1">Zapisz</button>
+    </div>
   </div>
 </div>
 
@@ -1116,6 +1147,100 @@ function doRemoveTask() {
   showToast(desc ? '🗑 Usunięto: ' + desc : '🗑 Usunięto zadanie');
 }
 
+// ===== EDYCJA ZADANIA =====
+let editingTask = null; // {date, id}
+
+function openEditTask(date, id) {
+  const t = (st.tasks[date]||[]).find(t=>t.id===id);
+  if (!t) return;
+  editingTask = {date, id};
+  // Wyciagnij czysta nazwe typu (bez oznaczen grupy/re-clean)
+  const baseName = t.typeName.replace(/ 👥×\d+/,'').replace(' (re-clean)','').trim();
+  // Osoby
+  const pSel = document.getElementById('edit-person');
+  pSel.innerHTML = PERSONS.map(p=>`<option value="${p}"${p===t.person?' selected':''}>${p}</option>`).join('');
+  // Typy
+  const tSel = document.getElementById('edit-type');
+  tSel.innerHTML = st.types.map((ty,i)=>`<option value="${i}"${ty.name===baseName?' selected':''}>${ty.name}</option>`).join('');
+  // Ilosc i godziny
+  document.getElementById('edit-loc').value = t.loc || '';
+  document.getElementById('edit-qty').value = Math.round(t.qty*10000)/10000;
+  document.getElementById('edit-hours').value = t.h;
+  document.getElementById('edit-modal').classList.remove('modal-hidden');
+}
+
+function onEditTypeChange() {
+  // Po zmianie typu podpowiedz domyslne godziny tego typu
+  const idx = parseInt(document.getElementById('edit-type').value);
+  const ty = st.types[idx];
+  if (ty && !ty.custom) document.getElementById('edit-hours').value = ty.h;
+}
+
+function saveEditTask() {
+  if (!editingTask) return;
+  const {date, id} = editingTask;
+  const t = (st.tasks[date]||[]).find(t=>t.id===id);
+  if (!t) { closeEditTask(); return; }
+  const snap = {tasks: JSON.parse(JSON.stringify(st.tasks)), logs: JSON.parse(JSON.stringify(st.logs))};
+  const newPerson = document.getElementById('edit-person').value;
+  const newTypeIdx = parseInt(document.getElementById('edit-type').value);
+  const newType = st.types[newTypeIdx];
+  const newQty = parseFloat(document.getElementById('edit-qty').value)||0;
+  const newHours = parseFloat(document.getElementById('edit-hours').value)||0;
+  const newLoc = document.getElementById('edit-loc').value.trim();
+  const oldPerson = t.person;
+
+  // Czy to zadanie dzielone (grupa)?
+  const isGroup = t.groupId != null && t.groupId !== '';
+  // Wpisy do zaktualizowania: cala grupa (wspolne pola) lub tylko ten wpis
+  const members = isGroup
+    ? (st.tasks[date]||[]).filter(x=>String(x.groupId)===String(t.groupId))
+    : [t];
+
+  members.forEach(m => {
+    // Zachowaj indywidualne oznaczenia grupy/re-clean tego wpisu
+    const groupTag = (m.typeName.match(/ 👥×\d+/)||[''])[0];
+    const recleanTag = m.typeName.includes('(re-clean)') ? ' (re-clean)' : '';
+    // Wspolne pola - zmieniaja sie u wszystkich w grupie
+    m.typeName = newType.name + recleanTag + groupTag;
+    m.qty = newQty;
+    m.h = newHours;
+    m.loc = newLoc;
+  });
+
+  // Osobe zmieniamy tylko na edytowanym wpisie (reszta grupy bez zmian)
+  t.person = newPerson;
+  if (newPerson !== oldPerson) {
+    if (!st.logs[date]) st.logs[date] = {};
+    if (st.logs[date][oldPerson] && st.logs[date][oldPerson].done) delete st.logs[date][oldPerson].done[id];
+    if (!st.logs[date][newPerson]) st.logs[date][newPerson] = {done:{},note:'',extra:0};
+    st.logs[date][newPerson].done[id] = true;
+    // Zaktualizuj liste wspolpracownikow (groupWith) u pozostalych
+    if (isGroup) {
+      members.forEach(m => {
+        if (m.id !== id && Array.isArray(m.groupWith)) {
+          m.groupWith = m.groupWith.map(p => p === oldPerson ? newPerson : p);
+        }
+      });
+      if (Array.isArray(t.groupWith)) t.groupWith = t.groupWith.filter(p=>p!==newPerson);
+    }
+  }
+
+  logChange('Edytowano zadanie', `${newType.name} ×${Math.round(newQty*100)/100}${isGroup?' (grupa)':''}`, snap);
+  saveState();
+  closeEditTask();
+  renderSummary();
+  renderAssign();
+  showToast(isGroup ? '✓ Zapisano (zmiana u całej grupy)' : '✓ Zapisano zmiany');
+}
+
+function closeEditTask() {
+  editingTask = null;
+  document.getElementById('edit-modal').classList.add('modal-hidden');
+}
+window.openEditTask = openEditTask;
+window.onEditTypeChange = onEditTypeChange;
+
 function addType() {
   const name = document.getElementById('nt-name').value.trim();
   const h = parseFloat(document.getElementById('nt-h').value);
@@ -1259,7 +1384,10 @@ function renderSummary() {
       <div class="sum-row">
         <span style="color:var(--text2);flex:1">${taskDisplayName(t)}${t.loc?' · '+t.loc:''}</span>
         <span style="margin-right:8px">${fh(t.h*t.qty)}</span>
-        <button class="del-btn" data-date="${date}" data-id="${t.id}" data-gid="${t.groupId||''}" onclick="removeTask(this.dataset.date,+this.dataset.id,this.dataset.gid);renderSummary()">
+        <button class="del-btn" style="margin-right:6px" data-date="${date}" data-id="${t.id}" onclick="openEditTask(this.dataset.date,+this.dataset.id)" title="Edytuj">
+          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+        </button>
+        <button class="del-btn" data-date="${date}" data-id="${t.id}" data-gid="${t.groupId||''}" onclick="removeTask(this.dataset.date,+this.dataset.id,this.dataset.gid);renderSummary()" title="Usuń">
           <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>`).join('');
@@ -1689,6 +1817,11 @@ window.sendBackup = sendBackup;
 
 document.getElementById('sync-btn').addEventListener('click', syncFromSheets);
 document.getElementById('confirm-ok-btn').addEventListener('click', doRemoveTask);
+document.getElementById('edit-save-btn').addEventListener('click', saveEditTask);
+document.getElementById('edit-cancel-btn').addEventListener('click', closeEditTask);
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditTask();
+});
 document.getElementById('confirm-cancel-btn').addEventListener('click', () => {
   pendingRemove = null;
   document.getElementById('confirm-modal').classList.add('modal-hidden');
