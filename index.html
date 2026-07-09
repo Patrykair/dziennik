@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v95</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v96</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -1684,11 +1684,26 @@ function renderWeek() {
     const totalDiffStr = totalDiff > 0 ? '+'+fh(totalDiff) : totalDiff < 0 ? fh(totalDiff) : '0h';
     const totalClass = totalDiff > 0 ? 'balance-plus' : totalDiff < 0 ? 'balance-minus' : 'balance-zero';
 
+    // Bilans ogolny (wszystkie dni) - pokazywany w prawym gornym rogu karty
+    let allEarned = 0, allSystem = 0, allDriving = 0, allDrivingReal = 0;
+    const allDays = new Set([...Object.keys(st.tasks||{}), ...Object.keys(st.logs||{})]);
+    allDays.forEach(d => {
+      const dTasks = (st.tasks[d]||[]).filter(t=>t.person===person);
+      const dLog = ((st.logs[d]||{})[person])||{extra:0,system:0,driving:0,drivingReal:0};
+      allEarned += dTasks.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(dLog.extra)||0);
+      allSystem += parseFloat(dLog.system)||0;
+      allDriving += parseFloat(dLog.driving)||0;
+      allDrivingReal += parseFloat(dLog.drivingReal)||0;
+    });
+    const overallDiff = allEarned + allDrivingReal - allSystem - allDriving;
+    const overallDiffStr = overallDiff > 0 ? '+'+fh(overallDiff) : overallDiff < 0 ? fh(overallDiff) : '0h';
+    const overallClass = overallDiff > 0 ? 'balance-plus' : overallDiff < 0 ? 'balance-minus' : 'balance-zero';
+
     return `<div class="person-card" style="margin-bottom:10px">
       <div class="person-top">
         <div class="avatar">${initials(person)}</div>
         <div class="person-name">${person}${isDriverPerson?' 🚗':''}</div>
-        <span class="${totalClass}" style="font-size:14px;font-weight:700">${totalDiffStr}</span>
+        <span class="${overallClass}" style="font-size:14px;font-weight:700" title="Bilans ogólny (wszystkie dni)">${overallDiffStr}</span>
       </div>
       <div style="padding:0 14px 10px;border-top:1px solid var(--border);overflow-x:auto">
         <table style="width:100%;border-collapse:collapse">
