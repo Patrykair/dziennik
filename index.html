@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v97</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v98</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -630,13 +630,17 @@ function mergeStates(local, cloud) {
   allTaskDays.forEach(day => {
     const localDay = (local.tasks||{})[day] || [];
     const cloudDay = (cloud.tasks||{})[day] || [];
-    // Scal zadania po ID (unikalne), pomijajac usuniete
+    // Scal zadania po ID - przy konflikcie wygrywa NOWSZA wersja (mod), remis = lokalna
     const byId = {};
-    [...cloudDay, ...localDay].forEach(t => { if (!deletedIds.has(t.id)) byId[t.id] = t; });
+    [...cloudDay, ...localDay].forEach(t => {
+      if (deletedIds.has(t.id)) return;
+      const ex = byId[t.id];
+      if (!ex || (t.mod||0) >= (ex.mod||0)) byId[t.id] = t;
+    });
     const mergedDay = Object.values(byId);
     if (mergedDay.length) merged.tasks[day] = mergedDay;
   });
-  // Scal logi - dla kazdego dnia i osoby wybierz nowszy/pelniejszy
+  // Scal logi - dla kazdego dnia i osoby wybierz NOWSZY wpis (mod); bez mod = stare zachowanie
   const allLogDays = new Set([...Object.keys(local.logs||{}), ...Object.keys(cloud.logs||{})]);
   allLogDays.forEach(day => {
     const localDay = (local.logs||{})[day] || {};
@@ -651,14 +655,30 @@ function mergeStates(local, cloud) {
       Object.keys(mergedDone).forEach(id => {
         if (deletedIds.has(parseInt(id)) || deletedIds.has(id)) delete mergedDone[id];
       });
-      merged.logs[day][person] = {
-        done: mergedDone,
-        note: lp.note || cp.note || '',
-        extra: Math.max(parseFloat(lp.extra)||0, parseFloat(cp.extra)||0),
-        system: Math.max(parseFloat(lp.system)||0, parseFloat(cp.system)||0),
-        driving: Math.max(parseFloat(lp.driving)||0, parseFloat(cp.driving)||0),
-        drivingReal: Math.max(parseFloat(lp.drivingReal)||0, parseFloat(cp.drivingReal)||0)
-      };
+      const lpMod = lp.mod||0, cpMod = cp.mod||0;
+      if (lpMod || cpMod) {
+        // Ktorys wpis ma znacznik czasu - bierz wartosci z nowszego (pozwala tez ZMNIEJSZAC)
+        const newer = lpMod >= cpMod ? lp : cp;
+        merged.logs[day][person] = {
+          done: mergedDone,
+          note: newer.note || '',
+          extra: parseFloat(newer.extra)||0,
+          system: parseFloat(newer.system)||0,
+          driving: parseFloat(newer.driving)||0,
+          drivingReal: parseFloat(newer.drivingReal)||0,
+          mod: Math.max(lpMod, cpMod)
+        };
+      } else {
+        // Stare dane bez znacznika - dotychczasowe scalanie (max)
+        merged.logs[day][person] = {
+          done: mergedDone,
+          note: lp.note || cp.note || '',
+          extra: Math.max(parseFloat(lp.extra)||0, parseFloat(cp.extra)||0),
+          system: Math.max(parseFloat(lp.system)||0, parseFloat(cp.system)||0),
+          driving: Math.max(parseFloat(lp.driving)||0, parseFloat(cp.driving)||0),
+          drivingReal: Math.max(parseFloat(lp.drivingReal)||0, parseFloat(cp.drivingReal)||0)
+        };
+      }
     });
   });
   return ensureFields(merged);
@@ -1215,6 +1235,7 @@ function saveEditTask() {
     m.qty = newQty;
     m.h = newHours;
     m.loc = newLoc;
+    m.mod = Date.now(); // znacznik edycji - nowsza wersja wygrywa przy scalaniu
   });
 
   // Osobe zmieniamy tylko na edytowanym wpisie (reszta grupy bez zmian)
@@ -1324,6 +1345,7 @@ function setNote(date, person, note) {
   if (!st.logs[date]) st.logs[date]={};
   if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0};
   st.logs[date][person].note = note;
+  st.logs[date][person].mod = Date.now();
   saveState();
 }
 function setExtra(date, person, val) {
@@ -1331,6 +1353,7 @@ function setExtra(date, person, val) {
   if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0};
   const snap = {tasks: JSON.parse(JSON.stringify(st.tasks)), logs: JSON.parse(JSON.stringify(st.logs))};
   st.logs[date][person].extra = parseFloat(val)||0;
+  st.logs[date][person].mod = Date.now();
   logChange('Zmiana dodatkowych godzin', `${person}: ${fh(parseFloat(val)||0)}`, snap);
   saveState();
   initPersonSelect();
@@ -1563,6 +1586,7 @@ function setDriving(date, person, val) {
   if (!st.logs[date]) st.logs[date]={};
   if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0,system:0,driving:0,drivingReal:0};
   st.logs[date][person].driving = parseFloat(val)||0;
+  st.logs[date][person].mod = Date.now();
   saveState();
   renderHours();
 }
@@ -1570,6 +1594,7 @@ function setDrivingReal(date, person, val) {
   if (!st.logs[date]) st.logs[date]={};
   if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0,system:0,driving:0,drivingReal:0};
   st.logs[date][person].drivingReal = parseFloat(val)||0;
+  st.logs[date][person].mod = Date.now();
   saveState();
   renderHours();
 }
@@ -1581,6 +1606,7 @@ function setSystem(date, person, val) {
   if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0,system:0};
   const snap = {tasks: JSON.parse(JSON.stringify(st.tasks)), logs: JSON.parse(JSON.stringify(st.logs))};
   st.logs[date][person].system = parseFloat(val)||0;
+  st.logs[date][person].mod = Date.now();
   logChange('Zmiana godzin w Polimanie', `${person}: ${fh(parseFloat(val)||0)}`, snap);
   saveState();
   renderHours();
