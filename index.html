@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v98</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v100</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -1468,7 +1468,23 @@ function renderSummary() {
 
   const typeLines = Object.entries(typeCounts).map(([name,count])=>`
     <div class="sum-row"><span style="color:var(--text2)">${name}</span><span>×${Math.round(count*100)/100}</span></div>`).join('');
-  mWrap.innerHTML = `<div class="card" style="grid-column:1/-1;margin-bottom:0">
+
+  // Zestawienie dnia: suma wyrobionych godzin i suma wpisanych w Polimanie
+  let polimanSum = 0;
+  Object.values(logs).forEach(l => { polimanSum += parseFloat(l.system)||0; });
+  const dayBalance = totalH - polimanSum;
+  const dayBalanceStr = dayBalance > 0 ? '+'+fh(dayBalance) : dayBalance < 0 ? fh(dayBalance) : '0h';
+  const dayBalanceClass = dayBalance > 0 ? 'balance-plus' : dayBalance < 0 ? 'balance-minus' : 'balance-zero';
+
+  mWrap.innerHTML = `<div class="card" style="grid-column:1/-1;margin-bottom:10px">
+    <div class="card-body" style="padding:12px 16px">
+      <div class="section-label" style="margin-top:0;margin-bottom:8px">Zestawienie dnia</div>
+      <div class="sum-row"><span style="font-weight:500">Godziny wyrobione</span><span style="font-weight:600">${fh(totalH)}</span></div>
+      <div class="sum-row"><span style="font-weight:500">Wpisane w Polimanie</span><span style="font-weight:600">${fh(polimanSum)}</span></div>
+      <div class="sum-row"><span style="font-weight:500">Różnica</span><span class="${dayBalanceClass}" style="font-weight:700">${dayBalanceStr}</span></div>
+    </div>
+  </div>
+  <div class="card" style="grid-column:1/-1;margin-bottom:0">
     <div class="card-body" style="padding:12px 16px">
       <div class="section-label" style="margin-top:0;margin-bottom:8px">Suma zadań zespołu</div>
       ${typeLines}
@@ -1479,6 +1495,22 @@ function renderSummary() {
 
 const DRIVERS = ['Maciej Skrouba','Kamil Gumieniak','Piotr Czaja','Natalia Laszewska'];
 
+// Kolejnosc wyswietlania w Godzinach i Tygodniu (osoby spoza listy trafiaja na koniec, alfabetycznie)
+const DISPLAY_ORDER = [
+  'Maciej Skrouba','Natalia Laszewska','Krystian Markiewicz','Kamil Gumieniak','Piotr Czaja',
+  'Aleksandra Wysocka','Bartosz Wolner','Ewa Hejmo','Ive Massani','Wiktoria Wojciechowska',
+  'Anna Jamiołkowska','Bartosz Jamiołkowski','Anna Pawelska'
+];
+function displaySort(list) {
+  return [...list].sort((a,b)=>{
+    const ia = DISPLAY_ORDER.indexOf(a), ib = DISPLAY_ORDER.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b,'pl');
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+
 function renderHours() {
   const date = st.date || today();
   const tasks = st.tasks[date]||[];
@@ -1486,7 +1518,7 @@ function renderHours() {
   const wrap = document.getElementById('hours-list-wrap');
 
   wrap.innerHTML = '<div class="section-label" style="margin-top:0">Bilans dzienny — ' + formatDate(date) + '</div>' +
-    [...PERSONS].sort((a,b)=>a.localeCompare(b,'pl')).map(person => {
+    displaySort(PERSONS).map(person => {
       const pLog = logs[person]||{done:{},note:'',extra:0,system:0,driving:0,drivingReal:0};
       const pts = tasks.filter(t=>t.person===person);
       const earnedH = pts.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(pLog.extra)||0);
@@ -1639,7 +1671,7 @@ function renderWeek() {
   const weekLabel = formatDate(weekDates[0]) + ' — ' + formatDate(weekDates[6]);
   document.getElementById('week-range-label').textContent = weekLabel;
 
-  const cards = PERSONS.map(person => {
+  const cards = displaySort(PERSONS).map(person => {
     let weekEarned = 0, weekSystem = 0, weekDriving = 0, weekDrivingReal = 0;
     const isDriverPerson = DRIVERS.includes(person);
     const dayRows = weekDates.map((d, i) => {
