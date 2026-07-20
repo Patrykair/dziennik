@@ -1,0 +1,1966 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1a1a2e">
+<title>Dziennik</title>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    // Sprawdzaj aktualizacje co zaladowanie
+    reg.update();
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'activated') {
+          // Nowa wersja gotowa — przeladuj
+          window.location.reload();
+        }
+      });
+    });
+  }).catch(()=>{});
+  // Sprawdzaj aktualizacje co 60s gdy aplikacja otwarta
+  setInterval(() => {
+    navigator.serviceWorker.getRegistration().then(reg => { if (reg) reg.update(); });
+  }, 60000);
+}
+</script>
+<style>
+  :root {
+    --bg: #f3f7f3;
+    --surface: #ffffff;
+    --surface2: #e9f2ea;
+    --border: #d4e3d6;
+    --text: #1b2e22;
+    --text2: #5a6f60;
+    --text3: #93a395;
+    --accent: #2d6a4f;
+    --accent-dark: #1b4332;
+    --accent-light: #d8f3dc;
+    --accent-text: #1b4332;
+    --accent-bright: #52b788;
+    --danger: #c0392b;
+    --danger-light: #fdf0ee;
+    --warn: #d68910;
+    --warn-light: #fdf6e8;
+    --header-bg: #1b4332;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --font: 'Georgia', serif;
+    --font-ui: -apple-system, 'Helvetica Neue', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: var(--font-ui); background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 80px; }
+
+  /* HEADER */
+  .header { background: var(--header-bg); color: #fff; padding: 16px 20px 14px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(27,67,50,.12); }
+  .header-title { font-family: var(--font); font-size: 19px; font-weight: normal; letter-spacing: -.3px; }
+  .header-date { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 2px; }
+  .date-btn { background: rgba(255,255,255,.12); border: none; color: #fff; padding: 6px 12px; border-radius: 20px; font-size: 13px; cursor: pointer; font-family: var(--font-ui); }
+
+  /* BOTTOM NAV */
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); display: flex; z-index: 100; box-shadow: 0 -2px 10px rgba(27,67,50,.06); }
+  .nav-btn { flex: 1; padding: 10px 4px 12px; border: none; background: transparent; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text3); font-size: 9px; font-family: var(--font-ui); transition: color .15s; }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* PAGES */
+  .page { display: none; padding: 16px; }
+  .page.active { display: block; }
+
+  /* SECTIONS */
+  .section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text3); margin-bottom: 10px; margin-top: 20px; }
+  .section-label:first-child { margin-top: 0; }
+
+  /* CARDS */
+  .card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(27,67,50,.05); }
+  .card-body { padding: 14px 16px; }
+  .card-header { padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+
+  /* PERSON CARD */
+  .person-card { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 10px; box-shadow: 0 1px 3px rgba(27,67,50,.05); }
+  .person-top { padding: 12px 14px; display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; letter-spacing: -.5px; }
+  .person-name { font-size: 15px; font-weight: 600; flex: 1; }
+  .hours-pill { background: var(--accent-light); color: var(--accent-text); font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
+
+  /* TASK ROWS */
+  .task-list { border-top: 1px solid var(--border); }
+  .task-item { padding: 10px 14px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
+  .task-item:last-child { border-bottom: none; }
+  .task-info { flex: 1; min-width: 0; }
+  .task-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
+  .task-h { font-size: 12px; color: var(--text2); white-space: nowrap; }
+  .del-btn { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); background: transparent; color: var(--text3); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .del-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+
+  /* FORM */
+  .form-group { margin-bottom: 12px; }
+  .form-label { font-size: 12px; color: var(--text2); margin-bottom: 5px; display: block; font-weight: 500; }
+  select, input[type=text], input[type=number], input[type=date], textarea {
+    width: 100%; padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--bg); color: var(--text); font-size: 15px; font-family: var(--font-ui);
+    -webkit-appearance: none; appearance: none;
+  }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6560' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+  textarea { resize: none; min-height: 70px; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  /* BUTTONS */
+  .btn { padding: 13px 20px; border-radius: var(--radius-sm); border: none; font-size: 15px; font-weight: 600; cursor: pointer; font-family: var(--font-ui); width: 100%; }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 2px 6px rgba(45,106,79,.25); }
+  .btn-primary:active { background: var(--accent-dark); }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-sm { width: auto; padding: 7px 14px; font-size: 13px; }
+  .btn-danger-sm { background: var(--danger-light); color: var(--danger); border: 1px solid #f5c9c4; width: auto; padding: 7px 14px; font-size: 13px; border-radius: var(--radius-sm); cursor: pointer; font-family: var(--font-ui); font-weight: 600; }
+
+  /* PREVIEW HOURS */
+  .preview-box { background: var(--accent-light); border-radius: var(--radius-sm); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .preview-label { font-size: 13px; color: var(--accent-text); }
+  .preview-h { font-size: 20px; font-weight: 700; color: var(--accent-text); }
+
+  /* METRICS */
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .metric-val { font-size: 26px; font-weight: 700; color: var(--text); }
+  .metric-lab { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+  /* LOG CHECKBOXES */
+  .log-task { padding: 11px 14px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .log-task:last-child { border-bottom: none; }
+  .check-box { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); background: transparent; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .15s; }
+  .check-box.checked { background: var(--accent); border-color: var(--accent); }
+  .check-box svg { width: 12px; height: 12px; stroke: #fff; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity .1s; }
+  .check-box.checked svg { opacity: 1; }
+  .log-task-name { flex: 1; font-size: 13px; }
+  .log-task-name.done { text-decoration: line-through; color: var(--text2); }
+  .log-h { font-size: 12px; color: var(--text2); }
+
+  /* SUMMARY */
+  .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .sum-row:last-child { border-bottom: none; }
+  .sum-total { font-weight: 700; color: var(--accent-text); font-size: 15px; padding-top: 10px; border-top: 2px solid var(--accent-light); margin-top: 4px; }
+  .note-box { background: var(--warn-light); border-left: 3px solid var(--warn); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 8px 12px; font-size: 12px; color: var(--warn); margin-top: 8px; }
+  .undone-box { background: var(--danger-light); border-left: 3px solid var(--danger); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 8px 12px; font-size: 12px; color: var(--danger); margin-top: 6px; }
+  .done-box { background: var(--accent-light); border-left: 3px solid var(--accent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 8px 12px; font-size: 12px; color: var(--accent-text); margin-top: 6px; }
+
+  /* TYPES MANAGER */
+  .type-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .type-row:last-child { border-bottom: none; }
+  .type-name { flex: 1; font-size: 14px; }
+  .type-h { font-size: 13px; color: var(--text2); min-width: 40px; text-align: right; }
+
+  /* DATE PICKER MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; display: flex; align-items: flex-end; }
+  .modal { background: var(--surface); border-radius: 20px 20px 0 0; padding: 20px 20px 36px; width: 100%; }
+  .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+  .modal-hidden { display: none; }
+
+  .empty { text-align: center; padding: 32px 20px; color: var(--text3); font-size: 14px; }
+
+  /* PERSON CHECKLIST */
+  .person-check-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:.5px solid var(--border); cursor:pointer; }
+  .person-check-item:last-child { border-bottom:none; }
+  .person-check-item input[type=checkbox] { width:18px; height:18px; flex-shrink:0; accent-color:var(--accent); }
+  .person-check-item .pcname { font-size:14px; }
+  .pci-avatar { width:26px; height:26px; border-radius:50%; background:var(--accent-light); color:var(--accent-text); display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0; }
+
+  /* TOAST */
+  .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%) translateY(20px); background:#1b4332; color:#fff; padding:10px 20px; border-radius:20px; font-size:13px; font-weight:500; opacity:0; transition:all .3s; z-index:300; pointer-events:none; white-space:nowrap; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* BALANCE */
+  .balance-plus { color:#16a34a; font-weight:700; }
+  .balance-minus { color:#dc2626; font-weight:700; }
+  .balance-zero { color:var(--text3); font-weight:700; }
+
+  /* PAIR BADGE */
+  .pair-badge { display:inline-flex; align-items:center; gap:4px; background:#eeedfe; color:#3c3489; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; margin-top:3px; }
+  .pair-avatar { width:18px; height:18px; border-radius:50%; background:#afa9ec; color:#26215c; font-size:8px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+
+  /* Collapsible log sections */
+  .collapse-btn { width: 100%; background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; font-size: 15px; font-weight: 600; color: var(--text); font-family: var(--font-ui); }
+  .collapse-arrow { transition: transform .2s; font-size: 12px; color: var(--text3); }
+  .collapse-arrow.open { transform: rotate(180deg); }
+  .collapse-body { display: none; }
+  .collapse-body.open { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
+  <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v102</span></div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
+      <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
+      <button id="open-date-modal" class="date-btn">📅</button>
+      <button id="day-next" class="date-btn" style="padding:6px 10px;font-size:16px">›</button>
+      <button id="hdr-week-prev" class="date-btn" style="padding:6px 10px;font-size:16px;display:none">‹</button>
+      <button id="hdr-week-label" class="date-btn" style="display:none">📆</button>
+      <button id="hdr-week-next" class="date-btn" style="padding:6px 10px;font-size:16px;display:none">›</button>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div class="header-date" id="header-date-display"></div>
+    <div id="sync-status" style="font-size:10px;color:rgba(255,255,255,.5)"></div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay modal-hidden" id="confirm-modal">
+  <div class="modal">
+    <h3>Usuń zadanie</h3>
+    <p id="confirm-text" style="font-size:14px;color:var(--text2);margin-bottom:16px"></p>
+    <div style="display:flex;gap:8px">
+      <button id="confirm-cancel-btn" class="btn btn-secondary" style="flex:1">Anuluj</button>
+      <button id="confirm-ok-btn" class="btn" style="flex:1;background:#c0392b;color:#fff">Usuń</button>
+    </div>
+  </div>
+</div>
+
+<!-- DATE MODAL -->
+<div class="modal-overlay modal-hidden" id="date-modal">
+  <div class="modal">
+    <h3>Wybierz datę</h3>
+    <input type="date" id="global-date-input" style="margin-bottom:16px" onchange="closeDateModal()">
+    <button id="confirm-date" class="btn btn-primary">Potwierdź</button>
+  </div>
+</div>
+
+<!-- EDIT TASK MODAL -->
+<div class="modal-overlay modal-hidden" id="edit-modal">
+  <div class="modal">
+    <h3>Edytuj zadanie</h3>
+    <div class="form-group">
+      <label class="form-label">Osoba</label>
+      <select id="edit-person"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Typ zadania</label>
+      <select id="edit-type" onchange="onEditTypeChange()"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Opis / Flat</label>
+      <input type="text" id="edit-loc" placeholder="np. numer flat">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Ilość</label>
+      <input type="number" id="edit-qty" step="0.1" min="0" inputmode="decimal">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Godziny (za sztukę)</label>
+      <input type="number" id="edit-hours" step="0.05" min="0" inputmode="decimal">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button id="edit-cancel-btn" class="btn btn-secondary" style="flex:1">Anuluj</button>
+      <button id="edit-save-btn" class="btn btn-primary" style="flex:1">Zapisz</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: PRZYDZIEL -->
+<div class="page active" id="page-assign" style="padding-top:8px">
+
+  <div class="card" style="margin-top:0">
+    <div class="card-body">
+      <div class="form-group">
+        <select id="a-person" onchange="previewHours()" style="display:none"></select>
+        <div id="collab-hint" style="font-size:11px;color:var(--text3);margin-bottom:6px;display:none">Kliknij kilka osób, aby przydzielić wspólne zadanie</div>
+        <div id="person-buttons" style="display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="collab-toggle" onchange="toggleCollab()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
+          Współpraca z innymi osobami
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Typ zadania</label>
+        <select id="a-type" onchange="onTypeChange()"></select>
+      </div>
+      <div class="form-group" style="display:flex;gap:14px;flex-wrap:wrap">
+        <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
+          <input type="checkbox" id="bedding-toggle" onchange="previewHours()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
+          Bedding
+        </label>
+        <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
+          <input type="checkbox" id="corridor-toggle" onchange="previewHours()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
+          Corridor
+        </label>
+        <label class="form-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:0">
+          <input type="checkbox" id="reclean-toggle" onchange="toggleReClean()" style="width:18px;height:18px;flex-shrink:0;accent-color:var(--accent);margin:0">
+          Re-clean (×0.5)
+        </label>
+      </div>
+      <div class="form-group" id="custom-hours-row" style="display:none">
+        <label class="form-label">Godziny dla Sprawdzania</label>
+        <input type="number" id="custom-hours" placeholder="Wpisz godziny" step="0.25" min="0.25" onchange="previewHours()">
+      </div>
+      <div class="row2">
+        <div class="form-group">
+          <label class="form-label">Ilość (szt.)</label>
+          <input type="number" id="a-qty" value="1" min="0.25" step="0.25" onchange="previewHours()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Flat</label>
+          <input type="text" id="a-loc">
+        </div>
+      </div>
+      <div class="preview-box">
+        <span class="preview-label" id="a-preview-label">Godziny na osobę</span>
+        <span class="preview-h" id="a-preview">—</span>
+      </div>
+      <button id="add-task-btn" class="btn btn-primary">+ Dodaj zadanie</button>
+    </div>
+  </div>
+
+  <div id="assign-list-wrap" style="display:none"></div>
+</div>
+
+<!-- PAGE: TYPY -->
+<div class="page" id="page-types">
+  <div class="section-label" style="margin-top:0">Typy zadań i normy</div>
+  <div class="card">
+    <div class="card-body">
+      <div id="types-list-manage"></div>
+      <div class="row2" style="margin-top:12px">
+        <input type="text" id="nt-name" placeholder="Nazwa zadania">
+        <input type="number" id="nt-h" placeholder="Godziny" step="0.25" min="0.25">
+      </div>
+      <button id="add-type-btn" class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%">+ Dodaj typ</button>
+      <button id="reset-types-btn" class="btn btn-danger-sm" style="margin-top:8px;width:100%">↺ Przywróć domyślne typy</button>
+    </div>
+  </div>
+
+  <div class="section-label">Backup danych</div>
+  <div class="card">
+    <div class="card-body">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Automatyczny backup wysyłany co poniedziałek na email. Możesz też wywołać go ręcznie.</p>
+      <button id="backup-now-btn" class="btn btn-secondary" style="width:100%">📦 Wyślij backup teraz</button>
+      <div id="backup-status" style="font-size:12px;color:var(--text2);margin-top:8px;text-align:center"></div>
+      <button id="force-pull-btn" class="btn btn-secondary" style="width:100%;margin-top:10px">☁️⬇ Wymuś pobranie z chmury</button>
+      <p style="font-size:11px;color:var(--text3);margin-top:6px">Użyj gdy urządzenia mają różne dane — pobierze wersję z Google Sheets na wszystkie.</p>
+      <label class="btn btn-secondary" style="width:100%;margin-top:10px;display:block;text-align:center;cursor:pointer">
+        📥 Wczytaj backup z pliku
+        <input type="file" id="import-backup-input" accept=".json,application/json" style="display:none">
+      </label>
+      <p style="font-size:11px;color:var(--text3);margin-top:6px">Wczytaj plik JSON z maila aby odzyskać dane.</p>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: GODZINY -->
+<div class="page" id="page-hours">
+  <div id="hours-list-wrap"></div>
+</div>
+
+<!-- PAGE: TYDZIEN -->
+<div class="page" id="page-week">
+  <div style="text-align:center;font-size:13px;color:var(--text2);font-weight:600;margin-bottom:16px" id="week-range-label"></div>
+  <div id="week-list-wrap"></div>
+</div>
+
+<!-- PAGE: PODSUMOWANIE -->
+<div class="page" id="page-summary">
+  <div id="metrics-wrap" class="metrics"></div>
+  <div id="summary-list-wrap"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-assign" data-page="assign">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14" stroke-width="2.5"/><line x1="12" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="8" y2="18" stroke-width="2.5"/><line x1="12" y1="18" x2="16" y2="18"/></svg>
+    Zadania
+  </button>
+  <button class="nav-btn" id="nav-summary" data-page="summary">
+    <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    Podsumowanie dnia
+  </button>
+  <button class="nav-btn" id="nav-hours" data-page="hours">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Godziny
+  </button>
+  <button class="nav-btn" id="nav-week" data-page="week">
+    <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Tydzień
+  </button>
+  <button class="nav-btn" id="nav-types" data-page="types">
+    <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1" fill="currentColor"/><circle cx="3" cy="12" r="1" fill="currentColor"/><circle cx="3" cy="18" r="1" fill="currentColor"/></svg>
+    Normy
+  </button>
+</nav>
+
+<script>
+window.addEventListener('DOMContentLoaded', function() {
+const PERSONS = [
+  "Maciej Skrouba","Natalia Laszewska","Aleksandra Wysocka","Bartosz Wolner","Wiktoria Wojciechowska",
+  "Kamil Gumieniak","Ewa Hejmo","Ive Massani","Krystian Markiewicz","Piotr Czaja",
+  "Anna Jamiołkowska"
+];
+
+const DEFAULT_TYPES = [
+  {name:"Ensuite Bedroom", h:1.5},
+  {name:"Non ensuite bedroom", h:0.5},
+  {name:"Twin En-Suite", h:1.75},
+  {name:"Twin non en-suite", h:0.75},
+  {name:"Bathroom", h:1.0},
+  {name:"Corridor", h:0.5},
+  {name:"Staircase", h:0.25},
+  {name:"Śmieci", h:1.0},
+  {name:"Bedding", h:0.25},
+  {name:"Studio", h:4.0},
+  {name:"Kitchen", h:6.0},
+  {name:"Kitchen (z lodówką)", h:7.0},
+  {name:"Large Kitchen", h:8.0},
+  {name:"Kitchen + 4 Bedrooms", h:12.0},
+  {name:"Kitchen + 5 Bedrooms", h:13.5},
+  {name:"Kitchen + 6 Bedrooms", h:15.0},
+  {name:"Large Kitchen + 6 Bedrooms", h:17.0},
+  {name:"Large Kitchen + 8 Bedrooms", h:20.0},
+  {name:"Large Kitchen + 10 Bedrooms", h:23.0},
+  {name:"Sprawdzanie", h:0, custom:true},
+  {name:"Kitchen 14h", h:14.0},
+  {name:"Kitchen 12h", h:12.0},
+  {name:"Kitchen 10h", h:10.0},
+];
+
+let st = loadState();
+let currentPage = 'assign';
+let selectedPersons = [];
+let reClean = false;
+
+function toggleReClean() {
+  reClean = document.getElementById('reclean-toggle').checked;
+  previewHours();
+}
+
+const SYNC_URL = 'https://script.google.com/macros/s/AKfycbxwr16s4QGOu7ybvKPEmXMf97BBazB9c2exi2TdskKDFLGKQoLrdkjpoNijt7qZKPw_Lg/exec';
+let syncTimeout = null;
+let lastSyncTime = null;
+let isSaving = false;
+let syncJustSent = false;
+
+function loadState() {
+  let data;
+  try {
+    const s = localStorage.getItem('cleaning_v4');
+    if (s) data = JSON.parse(s);
+  } catch(e) {}
+  if (!data || typeof data !== 'object') {
+    data = {};
+  }
+  // Zapewnij wszystkie wymagane pola (odpornosc na uszkodzone/stare dane)
+  if (!data.types || !Array.isArray(data.types) || !data.types.length) {
+    data.types = DEFAULT_TYPES;
+  } else {
+    // Dodaj brakujace domyslne typy (np. nowo dodane w kodzie) bez ruszania istniejacych
+    const existingNames = new Set(data.types.map(t => t.name));
+    DEFAULT_TYPES.forEach(dt => {
+      if (!existingNames.has(dt.name)) data.types.push(dt);
+    });
+  }
+  if (!data.tasks || typeof data.tasks !== 'object') data.tasks = {};
+  if (!data.logs || typeof data.logs !== 'object') data.logs = {};
+  if (!data.date) data.date = today();
+  if (!data.lastModified) data.lastModified = Date.now();
+  return data;
+}
+
+function saveState() {
+  st.lastModified = Date.now();
+  isSaving = true;
+  try { localStorage.setItem('cleaning_v4', JSON.stringify(st)); } catch(e) {}
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(syncToSheets, 800);
+}
+
+function syncToSheets(force) {
+  if (!navigator.onLine) {
+    setSyncStatus('offline');
+    localStorage.setItem('cleaning_pending_sync', 'true');
+    isSaving = false;
+    return;
+  }
+  // OCHRONA: nie wysylaj pustego stanu jesli w chmurze sa dane (chyba ze force)
+  const localEmpty = !st.tasks || Object.keys(st.tasks).length === 0;
+  if (localEmpty && !force) {
+    fetch(SYNC_URL + '?t=' + Date.now())
+      .then(r => r.json())
+      .then(cloud => {
+        const cloudHasData = cloud && cloud.tasks && Object.keys(cloud.tasks).length > 0;
+        if (cloudHasData) {
+          setSyncStatus('ok');
+          isSaving = false;
+          if (confirm('Lokalnie brak danych, ale w chmurze są zapisane zadania. Pobrać je z chmury?')) {
+            forcePullFromCloud(true);
+          }
+        } else {
+          doSyncToSheets();
+        }
+      })
+      .catch(() => { isSaving = false; setSyncStatus('error'); });
+    return;
+  }
+  doSyncToSheets();
+}
+
+function doSyncToSheets() {
+  setSyncStatus('syncing');
+  // Wysylamy WSZYSTKO oprocz history (history to lokalna funkcja cofania,
+  // nie trzeba jej synchronizowac - bez niej dane mieszcza sie w jednym zapisie)
+  const toSync = {
+    types: st.types,
+    tasks: st.tasks,
+    logs: st.logs,
+    date: st.date,
+    lastModified: st.lastModified,
+    deletedIds: st.deletedIds || []
+  };
+  const payload = JSON.stringify(toSync);
+  // Zapis przez POST no-cors - dane w tresci zadania, nie w URL
+  // (omija limit dlugosci URL ktory powodowal blad 400 na laptopie)
+  fetch(SYNC_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    body: payload,
+    headers: {'Content-Type': 'text/plain;charset=utf-8'}
+  })
+  .then(() => {
+    setTimeout(() => {
+      lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+      localStorage.removeItem('cleaning_pending_sync');
+      setSyncStatus('ok');
+      isSaving = false;
+      syncFromSheets(false);
+    }, 2500);
+  })
+  .catch(() => {
+    setSyncStatus('offline');
+    localStorage.setItem('cleaning_pending_sync', 'true');
+    isSaving = false;
+  });
+}
+
+function importBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || typeof data !== 'object' || !data.tasks) {
+        alert('Nieprawidłowy plik backupu.');
+        return;
+      }
+      if (!confirm('Wczytać dane z backupu? Obecne dane zostaną zastąpione.')) return;
+      st = data;
+      if (!st.types || !Array.isArray(st.types) || !st.types.length) { st.types = DEFAULT_TYPES; } else { const _en = new Set(st.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!_en.has(dt.name)) st.types.push(dt); }); }
+      if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
+      if (!st.logs || typeof st.logs !== 'object') st.logs = {};
+      st.date = today();
+      st.lastModified = Date.now();
+      localStorage.setItem('cleaning_v4', JSON.stringify(st));
+      localStorage.removeItem('cleaning_pending_sync');
+      updateHeader(); initPersonSelect(); initTypeSelect(); refresh();
+      syncToSheets(true);
+      showToast('✓ Backup wczytany i wysłany do chmury');
+    } catch(err) {
+      alert('Błąd wczytywania pliku: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+window.importBackup = importBackup;
+
+function forcePullFromCloud(silent) {
+  if (!navigator.onLine) { setSyncStatus('offline'); return; }
+  if (!silent && !confirm('Pobrać dane z chmury? Lokalne niezapisane zmiany zostaną zastąpione.')) return;
+  setSyncStatus('syncing');
+  fetch(SYNC_URL + '?t=' + Date.now())
+    .then(r => r.json())
+    .then(data => {
+      if (data && data.tasks) {
+        st = data;
+        if (!st.types || !Array.isArray(st.types) || !st.types.length) { st.types = DEFAULT_TYPES; } else { const _en = new Set(st.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!_en.has(dt.name)) st.types.push(dt); }); }
+        if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
+        if (!st.logs || typeof st.logs !== 'object') st.logs = {};
+        st.date = today();
+        st.lastModified = Date.now(); // ustaw nowy timestamp by ten stan byl "wiodacy"
+        localStorage.setItem('cleaning_v4', JSON.stringify(st));
+        localStorage.removeItem('cleaning_pending_sync');
+        lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+        setSyncStatus('ok');
+        updateHeader(); initPersonSelect(); initTypeSelect(); refresh();
+        syncToSheets(true); // wyslij z force (dane z chmury wiec nie pusto)
+        showToast('✓ Pobrano dane z chmury');
+      } else {
+        setSyncStatus('ok');
+        showToast('Brak danych w chmurze');
+      }
+    })
+    .catch(() => setSyncStatus('error'));
+}
+window.forcePullFromCloud = forcePullFromCloud;
+
+function ensureFields(s) {
+  if (!s.types || !Array.isArray(s.types) || !s.types.length) { s.types = DEFAULT_TYPES; }
+  else { const en = new Set(s.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!en.has(dt.name)) s.types.push(dt); }); }
+  if (!s.tasks || typeof s.tasks !== 'object') s.tasks = {};
+  if (!s.logs || typeof s.logs !== 'object') s.logs = {};
+  return s;
+}
+
+// Scal dwa stany - laczy dni z obu stron, nie gubi zadnych danych
+function mergeStates(local, cloud) {
+  const merged = { types: local.types, tasks: {}, logs: {}, date: local.date };
+  // Polacz listy usunietych ID z obu stron
+  const deletedIds = new Set([...(local.deletedIds||[]), ...(cloud.deletedIds||[])]);
+  merged.deletedIds = [...deletedIds];
+  // Zbierz wszystkie dni z obu zrodel
+  const allTaskDays = new Set([...Object.keys(local.tasks||{}), ...Object.keys(cloud.tasks||{})]);
+  allTaskDays.forEach(day => {
+    const localDay = (local.tasks||{})[day] || [];
+    const cloudDay = (cloud.tasks||{})[day] || [];
+    // Scal zadania po ID - przy konflikcie wygrywa NOWSZA wersja (mod), remis = lokalna
+    const byId = {};
+    [...cloudDay, ...localDay].forEach(t => {
+      if (deletedIds.has(t.id)) return;
+      const ex = byId[t.id];
+      if (!ex || (t.mod||0) >= (ex.mod||0)) byId[t.id] = t;
+    });
+    const mergedDay = Object.values(byId);
+    if (mergedDay.length) merged.tasks[day] = mergedDay;
+  });
+  // Scal logi - dla kazdego dnia i osoby wybierz NOWSZY wpis (mod); bez mod = stare zachowanie
+  const allLogDays = new Set([...Object.keys(local.logs||{}), ...Object.keys(cloud.logs||{})]);
+  allLogDays.forEach(day => {
+    const localDay = (local.logs||{})[day] || {};
+    const cloudDay = (cloud.logs||{})[day] || {};
+    merged.logs[day] = {};
+    const allPersons = new Set([...Object.keys(localDay), ...Object.keys(cloudDay)]);
+    allPersons.forEach(person => {
+      const lp = localDay[person] || {};
+      const cp = cloudDay[person] || {};
+      // Polacz "done" ale usun ID skasowanych zadan
+      const mergedDone = Object.assign({}, cp.done||{}, lp.done||{});
+      Object.keys(mergedDone).forEach(id => {
+        if (deletedIds.has(parseInt(id)) || deletedIds.has(id)) delete mergedDone[id];
+      });
+      const lpMod = lp.mod||0, cpMod = cp.mod||0;
+      if (lpMod || cpMod) {
+        // Ktorys wpis ma znacznik czasu - bierz wartosci z nowszego (pozwala tez ZMNIEJSZAC)
+        const newer = lpMod >= cpMod ? lp : cp;
+        merged.logs[day][person] = {
+          done: mergedDone,
+          note: newer.note || '',
+          extra: parseFloat(newer.extra)||0,
+          system: parseFloat(newer.system)||0,
+          driving: parseFloat(newer.driving)||0,
+          drivingReal: parseFloat(newer.drivingReal)||0,
+          mod: Math.max(lpMod, cpMod)
+        };
+      } else {
+        // Stare dane bez znacznika - dotychczasowe scalanie (max)
+        merged.logs[day][person] = {
+          done: mergedDone,
+          note: lp.note || cp.note || '',
+          extra: Math.max(parseFloat(lp.extra)||0, parseFloat(cp.extra)||0),
+          system: Math.max(parseFloat(lp.system)||0, parseFloat(cp.system)||0),
+          driving: Math.max(parseFloat(lp.driving)||0, parseFloat(cp.driving)||0),
+          drivingReal: Math.max(parseFloat(lp.drivingReal)||0, parseFloat(cp.drivingReal)||0)
+        };
+      }
+    });
+  });
+  return ensureFields(merged);
+}
+
+function applyMergedState(merged) {
+  // Zachowaj aktualnie przegladana date (zeby auto-sync nie przeskakiwal na dzis)
+  const viewedDate = st.date || today();
+  merged.date = viewedDate;
+  merged.lastModified = Date.now();
+  st = merged;
+  localStorage.setItem('cleaning_v4', JSON.stringify(st));
+  lastSyncTime = new Date().toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+  setSyncStatus('ok');
+  updateHeader(); initPersonSelect(); initTypeSelect(); refresh();
+}
+
+function syncFromSheets(isAutoLoad) {
+  if (!navigator.onLine) { setSyncStatus('offline'); return; }
+  if (isSaving) { return; }
+  if (!isAutoLoad) setSyncStatus('syncing');
+  fetch(SYNC_URL + '?t=' + Date.now())
+  .then(r => r.json())
+  .then(data => {
+    if (isSaving) { setSyncStatus('ok'); return; }
+    if (data && data.tasks) {
+      const countTasks = obj => Object.values(obj.tasks||{}).reduce((s,arr)=>s+(Array.isArray(arr)?arr.length:0),0);
+      const cloudCount = countTasks(data);
+      const localCount = countTasks(st);
+      // SCALANIE: polacz dane z chmury i lokalne - nic nie ginie
+      const merged = mergeStates(st, data);
+      const mergedCount = countTasks(merged);
+      applyMergedState(merged);
+      // Wyslij scalony stan do chmury TYLKO jesli ma wiecej niz chmura
+      // (czyli lokalnie bylo cos czego chmura nie ma) - i nie podczas zapisu
+      if (mergedCount > cloudCount && !isSaving && !syncJustSent) {
+        syncJustSent = true;
+        setTimeout(() => { syncJustSent = false; }, 5000);
+        syncToSheets(true);
+      }
+    } else {
+      setSyncStatus('ok');
+    }
+  })
+  .catch(() => { setSyncStatus('offline'); localStorage.setItem('cleaning_pending_sync', 'true'); });
+}
+
+function setSyncStatus(status) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  if (status === 'syncing') { el.textContent = '🔄 Synchronizacja...'; el.style.color = 'rgba(255,255,255,.6)'; }
+  if (status === 'ok') { el.textContent = '✓ Zsynchronizowano' + (lastSyncTime ? ' ' + lastSyncTime : ''); el.style.color = '#a8f0c8'; }
+  if (status === 'error') { el.textContent = '⚠️ Błąd sync'; el.style.color = '#f0a8a8'; }
+  if (status === 'offline') { el.textContent = '📵 Offline — zapisano lokalnie'; el.style.color = '#f0d080'; }
+}
+
+window.addEventListener('online', () => {
+  const pending = localStorage.getItem('cleaning_pending_sync');
+  if (pending) { showToast('📶 Połączono — synchronizuję...'); syncToSheets(); }
+  else setSyncStatus('ok');
+});
+window.addEventListener('offline', () => setSyncStatus('offline'));
+function today() { return new Date().toISOString().slice(0,10); }
+function formatDate(d) {
+  if (!d) return '';
+  const [y,m,day] = d.split('-');
+  const days = ['niedziela','poniedziałek','wtorek','środa','czwartek','piątek','sobota'];
+  const dt = new Date(y, m-1, day);
+  return `${days[dt.getDay()]}, ${day}.${m}.${y}`;
+}
+function initials(name) { return name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(); }
+function fh(h) { return parseFloat(h.toFixed(2)) + 'h'; }
+
+function openDateModal() {
+  document.getElementById('global-date-input').value = st.date || today();
+  document.getElementById('date-modal').classList.remove('modal-hidden');
+}
+function closeDateModal() {
+  const val = document.getElementById('global-date-input').value;
+  if (val) { st.date = val; saveState(); }
+  document.getElementById('date-modal').classList.add('modal-hidden');
+  updateHeader(); refresh();
+}
+document.getElementById('date-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeDateModal();
+});
+
+function onDateChange(val) {
+  if (!val) return;
+  st.date = val;
+  saveState();
+  updateHeader();
+  refresh();
+}
+
+
+
+
+
+
+
+function updateHeader() {
+  document.getElementById('header-date-display').textContent = formatDate(st.date || today());
+}
+
+function switchPage(page) {
+  currentPage = page;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.getElementById('nav-'+page).classList.add('active');
+  // W zakladce Tydzien pokaz strzalki tygodnia zamiast strzalek dnia
+  const isWeek = page === 'week';
+  document.getElementById('day-prev').style.display = isWeek ? 'none' : '';
+  document.getElementById('open-date-modal').style.display = isWeek ? 'none' : '';
+  document.getElementById('day-next').style.display = isWeek ? 'none' : '';
+  document.getElementById('hdr-week-prev').style.display = isWeek ? '' : 'none';
+  document.getElementById('hdr-week-label').style.display = isWeek ? '' : 'none';
+  document.getElementById('hdr-week-next').style.display = isWeek ? '' : 'none';
+  refresh();
+}
+
+function initPersonSelect() {
+  const date = st.date || today();
+  const logs = st.logs[date] || {};
+  const tasks = st.tasks[date] || [];
+  const assignedPersons = new Set(tasks.map(t => t.person));
+  const sel = document.getElementById('a-person');
+  const btnWrap = document.getElementById('person-buttons');
+
+  // Hidden select - utrzymywany dla zgodnosci (pierwsza zaznaczona osoba)
+  sel.innerHTML = PERSONS.map(p=>`<option value="${p}">${p}</option>`).join('');
+  // Usun z zaznaczonych osoby ktore juz nie istnieja
+  selectedPersons = selectedPersons.filter(p => PERSONS.includes(p));
+  if (selectedPersons.length) sel.value = selectedPersons[0];
+
+  // Build compact grid chips (zawsze widoczne, 2 kolumny, multi-wybor)
+  btnWrap.innerHTML = PERSONS.map(p => {
+    const hasTask = assignedPersons.has(p);
+    const selIdx = selectedPersons.indexOf(p);
+    const isSelected = selIdx !== -1;
+    const bg = isSelected ? 'var(--accent)' : (hasTask ? '#d1f0dd' : 'var(--surface)');
+    const color = isSelected ? '#fff' : (hasTask ? '#1b4332' : 'var(--text)');
+    const border = isSelected ? 'var(--accent-dark)' : (hasTask ? '#d4e3d6' : 'var(--border)');
+    // Policz godziny pracy danej osoby na dzis
+    const pTasks = tasks.filter(t => t.person === p);
+    const pLog = logs[p] || {extra:0};
+    const hoursToday = pTasks.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(pLog.extra)||0);
+    const hoursLabel = hoursToday > 0 ? fh(hoursToday) : '';
+    const hColor = isSelected ? '#fff' : '#16a34a';
+    // Numerek przy zaznaczonych (gdy wiecej niz jedna)
+    const badge = (isSelected && selectedPersons.length > 1)
+      ? `<span style="background:#fff;color:var(--accent);width:16px;height:16px;border-radius:50%;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${selIdx+1}</span>` : '';
+    return `<button type="button" class="person-btn" data-person="${escQ(p)}"
+      style="display:flex;align-items:center;justify-content:space-between;gap:6px;text-align:left;padding:7px 10px;border:1.5px solid ${border};border-radius:8px;background:${bg};color:${color};font-size:12px;font-family:var(--font-ui);cursor:pointer">
+      <span style="display:flex;align-items:center;gap:5px;overflow:hidden">${badge}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p}${DRIVERS.includes(p)?' 🚗':''}</span></span>
+      ${hoursLabel?`<span style="font-size:11px;font-weight:600;color:${hColor};flex-shrink:0">${hoursLabel}</span>`:''}
+    </button>`;
+  }).join('');
+
+  // Click handlers - toggle zaznaczenia
+  btnWrap.querySelectorAll('.person-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = btn.dataset.person;
+      const collabOn = document.getElementById('collab-toggle').checked;
+      if (collabOn) {
+        // Tryb wspolpracy - toggle wielu osob
+        const idx = selectedPersons.indexOf(p);
+        if (idx === -1) selectedPersons.push(p);
+        else selectedPersons.splice(idx, 1);
+      } else {
+        // Tryb pojedynczy - tylko jedna osoba
+        selectedPersons = [p];
+      }
+      if (selectedPersons.length) sel.value = selectedPersons[0];
+      initPersonSelect();
+      previewHours();
+    });
+  });
+}
+
+function toggleCollab() {
+  const on = document.getElementById('collab-toggle').checked;
+  document.getElementById('collab-hint').style.display = on ? 'block' : 'none';
+  // Wychodzac z trybu wspolpracy - zostaw tylko glowna osobe
+  if (!on && selectedPersons.length > 1) {
+    selectedPersons = [selectedPersons[0]];
+    initPersonSelect();
+  }
+  previewHours();
+}
+window.toggleCollab = toggleCollab;
+
+function getSelectedPersons() {
+  // Zwroc zaznaczone osoby (pierwsza = glowna, reszta = wspolpraca)
+  return selectedPersons.filter(p => p && PERSONS.includes(p));
+}
+function initTypeSelect() {
+  const s = document.getElementById('a-type');
+  // Zapamietaj aktualnie wybrany typ (zeby auto-sync go nie resetowal)
+  const prevName = s.value !== '' && st.types[s.value] ? st.types[s.value].name : null;
+  // Kolejnosc wyswietlania wedlug preferencji uzytkownika
+  const order = [
+    'Ensuite Bedroom',
+    'Twin En-Suite',
+    'Kitchen',
+    'Kitchen (z lodówką)',
+    'Large Kitchen',
+    'Kitchen + 4 Bedrooms',
+    'Kitchen + 5 Bedrooms',
+    'Kitchen + 6 Bedrooms',
+    'Large Kitchen + 6 Bedrooms',
+    'Large Kitchen + 8 Bedrooms',
+    'Large Kitchen + 10 Bedrooms',
+    'Studio',
+    'Sprawdzanie',
+    'Non ensuite bedroom',
+    'Twin non en-suite',
+    'Bathroom',
+    'Corridor',
+    'Staircase',
+    'Śmieci',
+    'Bedding',
+    'Kitchen 14h',
+    'Kitchen 12h',
+    'Kitchen 10h'
+  ];
+  // Posortuj typy wg kolejnosci, zachowujac oryginalne indeksy
+  const sorted = st.types
+    .map((t, i) => ({ type: t, idx: i }))
+    .sort((a, b) => {
+      const ia = order.indexOf(a.type.name);
+      const ib = order.indexOf(b.type.name);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+  s.innerHTML = sorted.map(({type, idx}) =>
+    `<option value="${idx}">${type.name}${type.custom ? '' : ' ('+type.h+'h)'}</option>`
+  ).join('');
+  // Przywroc poprzednio wybrany typ jesli nadal istnieje
+  if (prevName) {
+    const restoreIdx = st.types.findIndex(t => t.name === prevName);
+    if (restoreIdx !== -1) s.value = restoreIdx;
+  }
+  onTypeChange();
+}
+function onTypeChange() {
+  const idx = document.getElementById('a-type').value;
+  const type = st.types[idx];
+  const customRow = document.getElementById('custom-hours-row');
+  if (type && type.custom) {
+    customRow.style.display = 'block';
+  } else {
+    customRow.style.display = 'none';
+  }
+  previewHours();
+}
+function previewHours() {
+  const idx = document.getElementById('a-type').value;
+  const qty = parseFloat(document.getElementById('a-qty').value)||1;
+  const type = st.types[idx];
+  if (!type) return;
+  let h = type.custom ? (parseFloat(document.getElementById('custom-hours').value)||0) : type.h;
+  if (reClean) h = h / 2;
+  const persons = getSelectedPersons();
+  const count = persons.length || 1;
+  let totalH = h * qty;  // glowne zadanie
+
+  // Dolicz Bedding jesli zaznaczony (bedding zawsze 0.25, bez re-clean)
+  const beddingOn = document.getElementById('bedding-toggle') && document.getElementById('bedding-toggle').checked;
+  if (beddingOn) {
+    const ROOMS = {'Kitchen + 4 Bedrooms':4,'Kitchen + 5 Bedrooms':5,'Kitchen + 6 Bedrooms':6,
+      'Large Kitchen + 6 Bedrooms':6,'Large Kitchen + 8 Bedrooms':8,'Large Kitchen + 10 Bedrooms':10};
+    let bCount = 0;
+    if (ROOMS[type.name]) bCount = ROOMS[type.name] * qty;
+    else if (type.name==='Twin En-Suite'||type.name==='Twin non en-suite') bCount = 2 * qty;
+    else if (type.name==='Ensuite Bedroom'||type.name==='Non ensuite bedroom'||type.name==='Studio') bCount = qty;
+    const bType = st.types.find(t=>t.name==='Bedding');
+    totalH += bCount * (bType ? bType.h : 0.25);
+  }
+
+  // Dolicz Corridor jesli zaznaczony (wg liczby kuchni, re-clean dzieli na pol)
+  const corridorOn = document.getElementById('corridor-toggle') && document.getElementById('corridor-toggle').checked;
+  if (corridorOn) {
+    const KITCHENS = {'Kitchen':1,'Kitchen (z lodówką)':1,'Large Kitchen':1,'Kitchen + 4 Bedrooms':1,'Kitchen + 5 Bedrooms':1,
+      'Kitchen + 6 Bedrooms':1,'Large Kitchen + 6 Bedrooms':1,'Large Kitchen + 8 Bedrooms':1,'Large Kitchen + 10 Bedrooms':1,
+      'Kitchen 14h':1,'Kitchen 12h':1,'Kitchen 10h':1};
+    const kCount = (KITCHENS[type.name]||0) * qty;
+    const cType = st.types.find(t=>t.name==='Corridor');
+    let cH = cType ? cType.h : 0.5;
+    if (reClean) cH = cH / 2;
+    totalH += kCount * cH;
+  }
+
+  const perPerson = totalH / count;
+  const label = count > 1 ? `${fh(perPerson)} / os. (${count} osób, razem ${fh(totalH)})` : fh(totalH);
+  document.getElementById('a-preview').textContent = label;
+}
+
+function addTask() {
+  const date = st.date || today();
+  const persons = getSelectedPersons();
+  if (!persons.length) { alert('Zaznacz przynajmniej jedną osobę!'); return; }
+  const idx = parseInt(document.getElementById('a-type').value);
+  const qty = parseFloat(document.getElementById('a-qty').value)||1;
+  const loc = document.getElementById('a-loc').value.trim();
+  const type = st.types[idx];
+  if (!type) return;
+  const isReclean = reClean; // zapamietaj stan PRZED resetem (uzywane w bedding/corridor)
+  let baseH = type.custom ? (parseFloat(document.getElementById('custom-hours').value)||0) : type.h;
+  if (isReclean) baseH = baseH / 2;
+  const perPersonQty = qty / persons.length;
+  const isGroup = persons.length > 1;
+  const groupLabel = isGroup ? ` 👥×${persons.length}` : '';
+  const label = (isReclean ? type.name + ' (re-clean)' : type.name) + groupLabel;
+  const groupId = isGroup ? Date.now() : null;
+  if (!st.tasks[date]) st.tasks[date] = [];
+  const snap = {tasks: JSON.parse(JSON.stringify(st.tasks)), logs: JSON.parse(JSON.stringify(st.logs))};
+  persons.forEach((person, i) => {
+    const others = persons.filter(p=>p!==person);
+    const taskId = Date.now() + i;
+    st.tasks[date].push({
+      id: taskId,
+      person,
+      typeName: label,
+      h: baseH,
+      qty: perPersonQty,
+      loc,
+      groupWith: isGroup ? others : null,
+      groupId
+    });
+    if (!st.logs[date]) st.logs[date]={};
+    if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0};
+    st.logs[date][person].done[taskId] = true;
+  });
+  document.getElementById('a-loc').value = '';
+  document.getElementById('a-qty').value = 1;
+  if (type.custom) document.getElementById('custom-hours').value = '';
+  // Przy wlaczonej wspolpracy zostaw zaznaczone osoby (latwiej dodac kolejne wspolne zadanie)
+  const collabStillOn = document.getElementById('collab-toggle').checked;
+  if (!collabStillOn) selectedPersons = [];
+  reClean = false;
+  document.getElementById('reclean-toggle').checked = false;
+  logChange('Dodano zadanie', `${label} → ${persons.join(', ')}${loc?' (Flat: '+loc+')':''}`, snap);
+
+  // BEDDING — automatycznie dolicz wg liczby pokoi
+  const beddingToggle = document.getElementById('bedding-toggle');
+  if (beddingToggle && beddingToggle.checked) {
+    // Mapa: ile pokoi ma kazdy typ kombinowany
+    const ROOMS_IN_TYPE = {
+      'Kitchen + 4 Bedrooms': 4, 'Kitchen + 5 Bedrooms': 5, 'Kitchen + 6 Bedrooms': 6,
+      'Large Kitchen + 6 Bedrooms': 6, 'Large Kitchen + 8 Bedrooms': 8, 'Large Kitchen + 10 Bedrooms': 10
+    };
+    // Ile beddingow: typy z pokojami = liczba pokoi x qty, Twin = 2 lozka x qty, reszta = qty
+    let beddingCount = 0;
+    if (ROOMS_IN_TYPE[type.name]) {
+      beddingCount = ROOMS_IN_TYPE[type.name] * qty;
+    } else if (type.name === 'Twin En-Suite' || type.name === 'Twin non en-suite') {
+      beddingCount = 2 * qty; // twin = 2 lozka = 2 beddingi
+    } else if (type.name === 'Ensuite Bedroom' || type.name === 'Non ensuite bedroom') {
+      beddingCount = qty;
+    } else if (type.name === 'Studio') {
+      beddingCount = qty; // studio = 1 lozko
+    }
+
+    if (beddingCount > 0) {
+      const beddingType = st.types.find(t => t.name === 'Bedding');
+      const beddingH = beddingType ? beddingType.h : 0.25;
+      const beddingGroupId = isGroup ? Date.now() + 500 + Math.random() * 100 | 0 : null;
+      const beddingPerPerson = beddingCount / persons.length;
+      persons.forEach((person, i) => {
+        const others = persons.filter(p=>p!==person);
+        const bId = Date.now() + 1000 + i;
+        st.tasks[date].push({
+          id: bId,
+          person,
+          typeName: 'Bedding' + groupLabel,
+          h: beddingH,
+          qty: beddingPerPerson,
+          loc,
+          groupWith: isGroup ? others : null,
+          groupId: beddingGroupId
+        });
+        if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0};
+        st.logs[date][person].done[bId] = true;
+      });
+      logChange('Dodano zadanie', `Bedding ×${beddingCount} → ${persons.join(', ')}`, snap);
+    }
+    beddingToggle.checked = false;
+  }
+
+  // CORRIDOR — automatycznie dolicz wg liczby kuchni
+  const corridorToggle = document.getElementById('corridor-toggle');
+  if (corridorToggle && corridorToggle.checked) {
+    // Ile kuchni ma kazdy typ (typy zawierajace kuchnie = 1 kuchnia)
+    const KITCHENS_IN_TYPE = {
+      'Kitchen': 1, 'Kitchen (z lodówką)': 1, 'Large Kitchen': 1,
+      'Kitchen + 4 Bedrooms': 1, 'Kitchen + 5 Bedrooms': 1, 'Kitchen + 6 Bedrooms': 1,
+      'Large Kitchen + 6 Bedrooms': 1, 'Large Kitchen + 8 Bedrooms': 1, 'Large Kitchen + 10 Bedrooms': 1,
+      'Kitchen 14h': 1, 'Kitchen 12h': 1, 'Kitchen 10h': 1
+    };
+    const kitchenCount = (KITCHENS_IN_TYPE[type.name] || 0) * qty;
+    if (kitchenCount > 0) {
+      const corridorType = st.types.find(t => t.name === 'Corridor');
+      let corridorH = corridorType ? corridorType.h : 0.5;
+      if (isReclean) corridorH = corridorH / 2;
+      const corridorGroupId = isGroup ? Date.now() + 700 + Math.random() * 100 | 0 : null;
+      const corridorPerPerson = kitchenCount / persons.length;
+      const corridorLabel = (isReclean ? 'Corridor (re-clean)' : 'Corridor') + groupLabel;
+      persons.forEach((person, i) => {
+        const others = persons.filter(p=>p!==person);
+        const cId = Date.now() + 2000 + i;
+        st.tasks[date].push({
+          id: cId,
+          person,
+          typeName: corridorLabel,
+          h: corridorH,
+          qty: corridorPerPerson,
+          loc,
+          groupWith: isGroup ? others : null,
+          groupId: corridorGroupId
+        });
+        if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0};
+        st.logs[date][person].done[cId] = true;
+      });
+      logChange('Dodano zadanie', `Corridor ×${kitchenCount} → ${persons.join(', ')}`, snap);
+    }
+    corridorToggle.checked = false;
+  }
+
+  saveState();
+  initPersonSelect();
+  renderAssign();
+  previewHours();
+  showToast('✓ Zadanie dodane');
+}
+
+let pendingRemove = null;
+
+function removeTask(date, id, groupId) {
+  // Zbuduj dokladny opis usuwanego zadania
+  const tasks = st.tasks[date]||[];
+  const describe = t => {
+    if (!t) return 'zadanie';
+    const qtyStr = (t.qty && t.qty !== 1) ? ` ×${Math.round(t.qty*100)/100}` : '';
+    const hStr = ` — ${fh(t.h*t.qty)}`;
+    const locStr = t.loc ? ` · Flat ${t.loc}` : '';
+    const who = t.groupWith && t.groupWith.length
+      ? `${t.person} + ${t.groupWith.map(p=>p.split(' ')[0]).join(', ')}`
+      : t.person;
+    return `${t.typeName}${qtyStr}${hStr}\n${who}${locStr}`;
+  };
+  let taskName = '';
+  if (groupId) {
+    const t = tasks.find(t=>String(t.groupId)===String(groupId));
+    taskName = describe(t);
+  } else {
+    const t = tasks.find(t=>t.id===id);
+    taskName = describe(t);
+  }
+  pendingRemove = {date, id, groupId};
+  document.getElementById('confirm-text').textContent = `Usunąć to zadanie?\n\n${taskName}`;
+  document.getElementById('confirm-text').style.whiteSpace = 'pre-line';
+  document.getElementById('confirm-modal').classList.remove('modal-hidden');
+}
+
+function doRemoveTask() {
+  if (!pendingRemove) return;
+  const {date, id, groupId} = pendingRemove;
+  pendingRemove = null;
+  document.getElementById('confirm-modal').classList.add('modal-hidden');
+  const snap = {tasks: JSON.parse(JSON.stringify(st.tasks)), logs: JSON.parse(JSON.stringify(st.logs))};
+  let removed = [];
+  if (groupId) {
+    removed = (st.tasks[date]||[]).filter(t=>String(t.groupId)===String(groupId));
+    st.tasks[date] = (st.tasks[date]||[]).filter(t=>String(t.groupId)!==String(groupId));
+  } else {
+    removed = (st.tasks[date]||[]).filter(t=>t.id===id);
+    st.tasks[date] = (st.tasks[date]||[]).filter(t=>t.id!==id);
+  }
+  const desc = removed.map(t => {
+    const qtyStr = (t.qty && t.qty !== 1) ? ` ×${Math.round(t.qty*100)/100}` : '';
+    const hStr = ` (${fh(t.h*t.qty)})`;
+    const locStr = t.loc ? ` · Flat ${t.loc}` : '';
+    return `${t.typeName}${qtyStr}${hStr} — ${t.person}${locStr}`;
+  }).join(', ');
+  // Zapisz usuniete ID (tombstones) zeby merge ich nie przywrocil
+  if (!st.deletedIds) st.deletedIds = [];
+  removed.forEach(t => { if (st.deletedIds.indexOf(t.id) === -1) st.deletedIds.push(t.id); });
+  // Trzymaj max 500 ostatnich
+  if (st.deletedIds.length > 500) st.deletedIds = st.deletedIds.slice(-500);
+  logChange('Usunięto zadanie', desc || 'zadanie', snap);
+  saveState();
+  renderAssign();
+  if (currentPage === 'summary') renderSummary();
+  showToast(desc ? '🗑 Usunięto: ' + desc : '🗑 Usunięto zadanie');
+}
+
+// ===== EDYCJA ZADANIA =====
+let editingTask = null; // {date, id}
+
+function openEditTask(date, id) {
+  const t = (st.tasks[date]||[]).find(t=>t.id===id);
+  if (!t) return;
+  editingTask = {date, id};
+  // Wyciagnij czysta nazwe typu (bez oznaczen grupy/re-clean)
+  const baseName = t.typeName.replace(/ 👥×\d+/,'').replace(' (re-clean)','').trim();
+  // Osoby
+  const pSel = document.getElementById('edit-person');
+  pSel.innerHTML = PERSONS.map(p=>`<option value="${p}"${p===t.person?' selected':''}>${p}</option>`).join('');
+  // Typy
+  const tSel = document.getElementById('edit-type');
+  tSel.innerHTML = st.types.map((ty,i)=>`<option value="${i}"${ty.name===baseName?' selected':''}>${ty.name}</option>`).join('');
+  // Ilosc i godziny
+  document.getElementById('edit-loc').value = t.loc || '';
+  document.getElementById('edit-qty').value = Math.round(t.qty*10000)/10000;
+  document.getElementById('edit-hours').value = t.h;
+  document.getElementById('edit-modal').classList.remove('modal-hidden');
+}
+
+function onEditTypeChange() {
+  // Po zmianie typu podpowiedz domyslne godziny tego typu
+  const idx = parseInt(document.getElementById('edit-type').value);
+  const ty = st.types[idx];
+  if (ty && !ty.custom) document.getElementById('edit-hours').value = ty.h;
+}
+
+function saveEditTask() {
+  if (!editingTask) return;
+  const {date, id} = editingTask;
+  const t = (st.tasks[date]||[]).find(t=>t.id===id);
+  if (!t) { closeEditTask(); return; }
+  const snap = {tasks: JSON.parse(JSON.stringify(st.tasks)), logs: JSON.parse(JSON.stringify(st.logs))};
+  const newPerson = document.getElementById('edit-person').value;
+  const newTypeIdx = parseInt(document.getElementById('edit-type').value);
+  const newType = st.types[newTypeIdx];
+  const newQty = parseFloat(document.getElementById('edit-qty').value)||0;
+  const newHours = parseFloat(document.getElementById('edit-hours').value)||0;
+  const newLoc = document.getElementById('edit-loc').value.trim();
+  const oldPerson = t.person;
+
+  // Czy to zadanie dzielone (grupa)?
+  const isGroup = t.groupId != null && t.groupId !== '';
+  // Wpisy do zaktualizowania: cala grupa (wspolne pola) lub tylko ten wpis
+  const members = isGroup
+    ? (st.tasks[date]||[]).filter(x=>String(x.groupId)===String(t.groupId))
+    : [t];
+
+  members.forEach(m => {
+    // Zachowaj indywidualne oznaczenia grupy/re-clean tego wpisu
+    const groupTag = (m.typeName.match(/ 👥×\d+/)||[''])[0];
+    const recleanTag = m.typeName.includes('(re-clean)') ? ' (re-clean)' : '';
+    // Wspolne pola - zmieniaja sie u wszystkich w grupie
+    m.typeName = newType.name + recleanTag + groupTag;
+    m.qty = newQty;
+    m.h = newHours;
+    m.loc = newLoc;
+    m.mod = Date.now(); // znacznik edycji - nowsza wersja wygrywa przy scalaniu
+  });
+
+  // Osobe zmieniamy tylko na edytowanym wpisie (reszta grupy bez zmian)
+  t.person = newPerson;
+  if (newPerson !== oldPerson) {
+    if (!st.logs[date]) st.logs[date] = {};
+    if (st.logs[date][oldPerson] && st.logs[date][oldPerson].done) delete st.logs[date][oldPerson].done[id];
+    if (!st.logs[date][newPerson]) st.logs[date][newPerson] = {done:{},note:'',extra:0};
+    st.logs[date][newPerson].done[id] = true;
+    // Zaktualizuj liste wspolpracownikow (groupWith) u pozostalych
+    if (isGroup) {
+      members.forEach(m => {
+        if (m.id !== id && Array.isArray(m.groupWith)) {
+          m.groupWith = m.groupWith.map(p => p === oldPerson ? newPerson : p);
+        }
+      });
+      if (Array.isArray(t.groupWith)) t.groupWith = t.groupWith.filter(p=>p!==newPerson);
+    }
+  }
+
+  logChange('Edytowano zadanie', `${newType.name} ×${Math.round(newQty*100)/100}${isGroup?' (grupa)':''}`, snap);
+  saveState();
+  closeEditTask();
+  renderSummary();
+  renderAssign();
+  showToast(isGroup ? '✓ Zapisano (zmiana u całej grupy)' : '✓ Zapisano zmiany');
+}
+
+function closeEditTask() {
+  editingTask = null;
+  document.getElementById('edit-modal').classList.add('modal-hidden');
+}
+window.openEditTask = openEditTask;
+window.onEditTypeChange = onEditTypeChange;
+
+function addType() {
+  const name = document.getElementById('nt-name').value.trim();
+  const h = parseFloat(document.getElementById('nt-h').value);
+  if (!name || !h) return;
+  st.types.push({name, h});
+  document.getElementById('nt-name').value='';
+  document.getElementById('nt-h').value='';
+  saveState(); initTypeSelect(); renderTypesManage();
+}
+function removeType(i) {
+  st.types.splice(i,1);
+  saveState(); initTypeSelect(); renderTypesManage();
+}
+window.removeType = removeType;
+
+function renderAssign() {
+  const date = st.date || today();
+  const tasks = st.tasks[date]||[];
+  const logs = st.logs[date]||{};
+  const wrap = document.getElementById('assign-list-wrap');
+  if (!tasks.length) { wrap.innerHTML='<div class="empty">Brak zadań na ten dzień</div>'; return; }
+
+  const byPerson = {};
+  tasks.forEach(t=>{ if(!byPerson[t.person]) byPerson[t.person]=[]; byPerson[t.person].push(t); });
+
+  wrap.innerHTML = Object.entries(byPerson).map(([person, pts])=>{
+      const pLog = logs[person]||{done:{},note:'',extra:0};
+      const doneH = pts.reduce((s,t)=>pLog.done[t.id]?s+t.h*t.qty:s,0);
+      const extra = parseFloat(pLog.extra)||0;
+      const totalH = doneH + extra;
+      const rows = pts.map(t=>`
+        <div class="task-item">
+          <div class="task-info">
+            <div class="task-name">${t.qty!==1?t.qty+'× ':''}${t.typeName}${t.loc?' · '+t.loc:''}</div>
+            ${t.groupWith&&t.groupWith.length?`<div style="margin-top:3px">${t.groupWith.map(p=>`<span class="pair-badge"><span class="pair-avatar">${initials(p)}</span> ${p.split(' ')[0]}</span>`).join(' ')}</div>`:''}
+          </div>
+          <span class="task-h">${fh(t.h*t.qty)}</span>
+          <button class="del-btn" data-date="${date}" data-id="${t.id}" data-gid="${t.groupId||''}" onclick="removeTask(this.dataset.date,+this.dataset.id,this.dataset.gid)">
+            <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>`).join('');
+      return `<div class="person-card" style="margin-bottom:10px">
+        <div class="person-top">
+          <div class="avatar">${initials(person)}</div>
+          <div class="person-name">${person}</div>
+          <div class="hours-pill">${fh(totalH)}</div>
+        </div>
+        <div class="task-list">${rows}</div>
+      </div>`;
+    }).join('');
+}
+
+function renderTypesManage() {
+  const el = document.getElementById('types-list-manage');
+  el.innerHTML = st.types.map((t,i)=>`
+    <div class="type-row">
+      <span class="type-name">${t.name}</span>
+      <span class="type-h">${t.h}h</span>
+      <button class="btn-danger-sm" onclick="removeType(${i})">Usuń</button>
+    </div>`).join('');
+}
+
+function escQ(s) { return s.replace(/'/g,"\\'"); }
+
+function toggleDone(date, person, taskId) {
+  if (!st.logs[date]) st.logs[date]={};
+  if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0};
+  st.logs[date][person].done[taskId] = !st.logs[date][person].done[taskId];
+  saveState(); renderAssign();
+}
+function setNote(date, person, note) {
+  if (!st.logs[date]) st.logs[date]={};
+  if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0};
+  st.logs[date][person].note = note;
+  st.logs[date][person].mod = Date.now();
+  saveState();
+}
+function setExtra(date, person, val) {
+  if (!st.logs[date]) st.logs[date]={};
+  if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0};
+  const snap = {tasks: JSON.parse(JSON.stringify(st.tasks)), logs: JSON.parse(JSON.stringify(st.logs))};
+  st.logs[date][person].extra = parseFloat(val)||0;
+  st.logs[date][person].mod = Date.now();
+  logChange('Zmiana dodatkowych godzin', `${person}: ${fh(parseFloat(val)||0)}`, snap);
+  saveState();
+  initPersonSelect();
+  previewHours();
+  renderAssign();
+}
+
+function renderSummary() {
+  const date = st.date || today();
+  const tasks = st.tasks[date]||[];
+  const logs = st.logs[date]||{};
+  const mWrap = document.getElementById('metrics-wrap');
+  const sWrap = document.getElementById('summary-list-wrap');
+
+  if (!tasks.length) {
+    // Brak zadan, ale moga byc wpisy Poliman - pokaz zestawienie jesli sa
+    let pSum = 0;
+    Object.values(logs).forEach(l => { pSum += parseFloat(l.system)||0; });
+    if (pSum > 0) {
+      mWrap.innerHTML = `<div class="card" style="grid-column:1/-1;margin-bottom:0">
+        <div class="card-body" style="padding:12px 16px">
+          <div class="section-label" style="margin-top:0;margin-bottom:8px">Zestawienie dnia</div>
+          <div class="sum-row"><span style="font-weight:500">Godziny wyrobione</span><span style="font-weight:600">0h</span></div>
+          <div class="sum-row"><span style="font-weight:500">Wpisane w Polimanie</span><span style="font-weight:600">${fh(pSum)}</span></div>
+          <div class="sum-row"><span style="font-weight:500">Różnica</span><span class="balance-minus" style="font-weight:700">-${fh(pSum)}</span></div>
+        </div>
+      </div>`;
+      sWrap.innerHTML = '<div class="empty">Brak zadań na ten dzień</div>';
+    } else {
+      mWrap.innerHTML=''; sWrap.innerHTML='<div class="empty">Brak danych na ten dzień</div>';
+    }
+    return;
+  }
+
+  const byPerson = {};
+  tasks.forEach(t=>{ if(!byPerson[t.person]) byPerson[t.person]=[]; byPerson[t.person].push(t); });
+
+  let totalH=0, totalTasks=0;
+  // Sortuj osoby alfabetycznie po imieniu (polskie znaki)
+  const sortedPersons = Object.keys(byPerson).sort((a,b)=>a.localeCompare(b,'pl'));
+  const cards = sortedPersons.map(person=>{
+    const pts = byPerson[person];
+    const pLog = logs[person]||{done:{},note:'',extra:0};
+    const doneH = pts.reduce((s,t)=>s+t.h*t.qty,0);
+    const extra = parseFloat(pLog.extra)||0;
+    const personTotal = doneH + extra;
+    totalH += personTotal;
+    totalTasks += pts.length;
+
+    const noteText = pLog.note || '';
+    const COMBINED_DISP = {
+      'Kitchen + 4 Bedrooms': {Kitchen:1, 'Ensuite Bedroom':4},
+      'Kitchen + 5 Bedrooms': {Kitchen:1, 'Ensuite Bedroom':5},
+      'Kitchen + 6 Bedrooms': {Kitchen:1, 'Ensuite Bedroom':6},
+      'Large Kitchen + 6 Bedrooms': {'Large Kitchen':1, 'Ensuite Bedroom':6},
+      'Large Kitchen + 8 Bedrooms': {'Large Kitchen':1, 'Ensuite Bedroom':8},
+      'Large Kitchen + 10 Bedrooms': {'Large Kitchen':1, 'Ensuite Bedroom':10},
+    };
+    function fmtNum(n) {
+      if (Number.isInteger(n)) return n;
+      return Math.round(n*100)/100;
+    }
+    function taskDisplayName(t) {
+      const base = t.typeName.replace(/ 👥×\d+/,'').replace(' (re-clean)','').trim();
+      const reclean = t.typeName.includes('(re-clean)') ? ' (re-clean)' : '';
+      const mapping = COMBINED_DISP[base];
+      if (mapping && t.qty !== 1) {
+        // Rozbij na komponenty pomnozone przez qty
+        const parts = Object.entries(mapping).map(([part, n]) => `${fmtNum(n*t.qty)} ${part}`).join(' + ');
+        return parts + reclean;
+      }
+      // Zwykly typ lub qty=1
+      return (t.qty!==1?t.qty+'× ':'') + base + reclean;
+    }
+    const taskLines = pts.map(t=>`
+      <div class="sum-row">
+        <span style="color:var(--text2);flex:1">${taskDisplayName(t)}${t.loc?' · '+t.loc:''}</span>
+        <span style="margin-right:8px">${fh(t.h*t.qty)}</span>
+        <button class="del-btn" style="margin-right:6px" data-date="${date}" data-id="${t.id}" onclick="openEditTask(this.dataset.date,+this.dataset.id)" title="Edytuj">
+          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+        </button>
+        <button class="del-btn" data-date="${date}" data-id="${t.id}" data-gid="${t.groupId||''}" onclick="removeTask(this.dataset.date,+this.dataset.id,this.dataset.gid);renderSummary()" title="Usuń">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>`).join('');
+    return `<div class="person-card" style="margin-bottom:10px">
+      <div class="person-top">
+        <div class="avatar">${initials(person)}</div>
+        <div class="person-name">${person}</div>
+        <div class="hours-pill">${fh(personTotal)}</div>
+      </div>
+      <div style="padding:10px 14px;border-top:1px solid var(--border)">
+        ${taskLines}
+        ${extra>0?`<div class="sum-row"><span style="color:var(--text2)">Dodatkowe</span><span>+${fh(extra)}</span></div>`:''}
+        <div class="sum-row sum-total"><span>Razem</span><span>${fh(personTotal)}</span></div>
+        ${noteText?`<div class="note-box">📝 ${noteText}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const COMBINED_MAP = {
+    'Kitchen + 4 Bedrooms':  {Kitchen:1, 'Ensuite Bedroom':4},
+    'Kitchen + 5 Bedrooms':  {Kitchen:1, 'Ensuite Bedroom':5},
+    'Kitchen + 6 Bedrooms':  {Kitchen:1, 'Ensuite Bedroom':6},
+    'Large Kitchen + 6 Bedrooms':  {'Large Kitchen':1, 'Ensuite Bedroom':6},
+    'Large Kitchen + 8 Bedrooms':  {'Large Kitchen':1, 'Ensuite Bedroom':8},
+    'Large Kitchen + 10 Bedrooms': {'Large Kitchen':1, 'Ensuite Bedroom':10},
+  };
+
+  const typeCounts = {};
+  tasks.forEach(t => {
+    // Zachowaj oznaczenie re-clean jako osobna pozycje, usun tylko etykiete grupy
+    const isReclean = t.typeName.includes('(re-clean)');
+    const base = t.typeName.replace(/ 👥×\d+/,'').replace(' (re-clean)','').trim();
+    const suffix = isReclean ? ' (re-clean)' : '';
+    const qty = t.qty || 1;
+    const mapping = COMBINED_MAP[base];
+    if (mapping) {
+      Object.entries(mapping).forEach(([part, n]) => {
+        const key = part + suffix;
+        typeCounts[key] = (typeCounts[key]||0) + n * qty;
+      });
+    } else {
+      const key = base + suffix;
+      typeCounts[key] = (typeCounts[key]||0) + qty;
+    }
+  });
+
+  const typeLines = Object.entries(typeCounts).map(([name,count])=>`
+    <div class="sum-row"><span style="color:var(--text2)">${name}</span><span>×${Math.round(count*100)/100}</span></div>`).join('');
+
+  // Zestawienie dnia: suma wyrobionych godzin i suma wpisanych w Polimanie
+  let polimanSum = 0;
+  Object.values(logs).forEach(l => { polimanSum += parseFloat(l.system)||0; });
+  const dayBalance = totalH - polimanSum;
+  const dayBalanceStr = dayBalance > 0 ? '+'+fh(dayBalance) : dayBalance < 0 ? fh(dayBalance) : '0h';
+  const dayBalanceClass = dayBalance > 0 ? 'balance-plus' : dayBalance < 0 ? 'balance-minus' : 'balance-zero';
+
+  mWrap.innerHTML = `<div class="card" style="grid-column:1/-1;margin-bottom:10px">
+    <div class="card-body" style="padding:12px 16px">
+      <div class="section-label" style="margin-top:0;margin-bottom:8px">Zestawienie dnia</div>
+      <div class="sum-row"><span style="font-weight:500">Godziny wyrobione</span><span style="font-weight:600">${fh(totalH)}</span></div>
+      <div class="sum-row"><span style="font-weight:500">Wpisane w Polimanie</span><span style="font-weight:600">${fh(polimanSum)}</span></div>
+      <div class="sum-row"><span style="font-weight:500">Różnica</span><span class="${dayBalanceClass}" style="font-weight:700">${dayBalanceStr}</span></div>
+    </div>
+  </div>
+  <div class="card" style="grid-column:1/-1;margin-bottom:0">
+    <div class="card-body" style="padding:12px 16px">
+      <div class="section-label" style="margin-top:0;margin-bottom:8px">Suma zadań zespołu</div>
+      ${typeLines}
+    </div>
+  </div>`;
+  sWrap.innerHTML = '<div class="section-label">Szczegóły według pracownika</div>' + cards;
+}
+
+const DRIVERS = ['Maciej Skrouba','Kamil Gumieniak','Piotr Czaja','Natalia Laszewska'];
+
+// Kolejnosc wyswietlania w Godzinach i Tygodniu (osoby spoza listy trafiaja na koniec, alfabetycznie)
+const DISPLAY_ORDER = [
+  'Maciej Skrouba','Natalia Laszewska','Krystian Markiewicz','Kamil Gumieniak','Piotr Czaja',
+  'Aleksandra Wysocka','Bartosz Wolner','Ewa Hejmo','Ive Massani','Wiktoria Wojciechowska',
+  'Anna Jamiołkowska'
+];
+function displaySort(list) {
+  return [...list].sort((a,b)=>{
+    const ia = DISPLAY_ORDER.indexOf(a), ib = DISPLAY_ORDER.indexOf(b);
+    if (ia === -1 && ib === -1) return a.localeCompare(b,'pl');
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+
+function renderHours() {
+  const date = st.date || today();
+  const tasks = st.tasks[date]||[];
+  const logs = st.logs[date]||{};
+  const wrap = document.getElementById('hours-list-wrap');
+
+  wrap.innerHTML = '<div class="section-label" style="margin-top:0">Bilans dzienny — ' + formatDate(date) + '</div>' +
+    displaySort(PERSONS).map(person => {
+      const pLog = logs[person]||{done:{},note:'',extra:0,system:0,driving:0,drivingReal:0};
+      const pts = tasks.filter(t=>t.person===person);
+      const earnedH = pts.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(pLog.extra)||0);
+      const systemH = parseFloat(pLog.system)||0;
+      const drivingH = parseFloat(pLog.driving)||0;
+      const drivingRealH = parseFloat(pLog.drivingReal)||0;
+      // Bilans = wykonane + faktyczne kierowanie - poliman - poliman kierowanie
+      const dayDiff = earnedH + drivingRealH - systemH - drivingH;
+      const dayDiffStr = dayDiff > 0 ? '+'+fh(dayDiff) : dayDiff < 0 ? fh(dayDiff) : '0h';
+      const dayClass = dayDiff > 0 ? 'balance-plus' : dayDiff < 0 ? 'balance-minus' : 'balance-zero';
+      const isDriver = DRIVERS.includes(person);
+
+      // Overall balance across ALL dates
+      let totalEarned = 0, totalSystem = 0, totalDriving = 0, totalDrivingReal = 0;
+      const allDates = new Set([...Object.keys(st.tasks||{}), ...Object.keys(st.logs||{})]);
+      allDates.forEach(d => {
+        const dTasks = (st.tasks[d]||[]).filter(t=>t.person===person);
+        const dLog = (st.logs[d]||{})[person]||{extra:0,system:0,driving:0,drivingReal:0};
+        totalEarned += dTasks.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(dLog.extra)||0);
+        totalSystem += parseFloat(dLog.system)||0;
+        totalDriving += parseFloat(dLog.driving)||0;
+        totalDrivingReal += parseFloat(dLog.drivingReal)||0;
+      });
+      const totalDiff = totalEarned + totalDrivingReal - totalSystem - totalDriving;
+      const totalDiffStr = totalDiff > 0 ? '+'+fh(totalDiff) : totalDiff < 0 ? fh(totalDiff) : '0h';
+      const totalClass = totalDiff > 0 ? 'balance-plus' : totalDiff < 0 ? 'balance-minus' : 'balance-zero';
+
+      // Bilans tygodniowy (tydzien zawierajacy wybrana date)
+      const wDates = getWeekDates(date);
+      let wEarned = 0, wSystem = 0, wDriving = 0, wDrivingReal = 0;
+      wDates.forEach(d => {
+        const dTasks = (st.tasks[d]||[]).filter(t=>t.person===person);
+        const dLog = (st.logs[d]||{})[person]||{extra:0,system:0,driving:0,drivingReal:0};
+        wEarned += dTasks.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(dLog.extra)||0);
+        wSystem += parseFloat(dLog.system)||0;
+        wDriving += parseFloat(dLog.driving)||0;
+        wDrivingReal += parseFloat(dLog.drivingReal)||0;
+      });
+      const weekDiff = wEarned + wDrivingReal - wSystem - wDriving;
+      const weekDiffStr = weekDiff > 0 ? '+'+fh(weekDiff) : weekDiff < 0 ? fh(weekDiff) : '0h';
+      const weekClass = weekDiff > 0 ? 'balance-plus' : weekDiff < 0 ? 'balance-minus' : 'balance-zero';
+
+      const drivingRow = isDriver ? `
+          <div class="sum-row" style="background:var(--warn-light);margin:0 -14px;padding:6px 14px;">
+            <span style="color:var(--warn)">🚗 Faktycznie kierowane (+)</span>
+            <input type="number" step="0.25" min="0" value="${drivingRealH||''}" placeholder="0"
+              style="width:90px;text-align:right;padding:4px 8px;font-size:14px"
+              data-date="${date}" data-person="${escQ(person)}" onchange="setDrivingReal(this.dataset.date,this.dataset.person,this.value)">
+          </div>
+          <div class="sum-row" style="background:var(--warn-light);margin:0 -14px;padding:6px 14px;">
+            <span style="color:var(--warn)">🚗 Kierowanie Poliman (−)</span>
+            <input type="number" step="0.25" min="0" value="${drivingH||''}" placeholder="0"
+              style="width:90px;text-align:right;padding:4px 8px;font-size:14px"
+              data-date="${date}" data-person="${escQ(person)}" onchange="setDriving(this.dataset.date,this.dataset.person,this.value)">
+          </div>` : '';
+
+      return `<div class="person-card" style="margin-bottom:10px">
+        <div class="person-top">
+          <div class="avatar">${initials(person)}</div>
+          <div class="person-name">${person}${isDriver?' 🚗':''}</div>
+        </div>
+        <div style="padding:10px 14px;border-top:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">Dziś</div>
+          <div class="sum-row">
+            <span style="color:var(--text2)">Wykonane</span>
+            <span>${fh(earnedH)}</span>
+          </div>
+          <div class="sum-row">
+            <span style="color:var(--text2)">Wpisane w Polimanie</span>
+            <input type="number" step="0.25" min="0" value="${systemH||''}" placeholder="0"
+              style="width:90px;text-align:right;padding:4px 8px;font-size:14px"
+              data-date="${date}" data-person="${escQ(person)}" onchange="setSystem(this.dataset.date,this.dataset.person,this.value)">
+          </div>
+          ${drivingRow}
+          <div class="sum-row">
+            <span style="font-weight:500">Bilans dzienny</span>
+            <span class="${dayClass}">${dayDiffStr}</span>
+          </div>
+          <div style="border-top:1px dashed var(--border);margin:10px 0"></div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">Ten tydzień</div>
+          <div class="sum-row">
+            <span style="font-weight:500">Bilans tygodniowy</span>
+            <span class="${weekClass}">${weekDiffStr}</span>
+          </div>
+          <div style="border-top:1px dashed var(--border);margin:10px 0"></div>
+          <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">Ogólny (wszystkie dni)</div>
+          <div class="sum-row">
+            <span style="font-weight:500">Bilans ogólny</span>
+            <span class="${totalClass}">${totalDiffStr}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+function setDriving(date, person, val) {
+  if (!st.logs[date]) st.logs[date]={};
+  if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0,system:0,driving:0,drivingReal:0};
+  st.logs[date][person].driving = parseFloat(val)||0;
+  st.logs[date][person].mod = Date.now();
+  saveState();
+  renderHours();
+}
+function setDrivingReal(date, person, val) {
+  if (!st.logs[date]) st.logs[date]={};
+  if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0,system:0,driving:0,drivingReal:0};
+  st.logs[date][person].drivingReal = parseFloat(val)||0;
+  st.logs[date][person].mod = Date.now();
+  saveState();
+  renderHours();
+}
+window.setDriving = setDriving;
+window.setDrivingReal = setDrivingReal;
+
+function setSystem(date, person, val) {
+  if (!st.logs[date]) st.logs[date]={};
+  if (!st.logs[date][person]) st.logs[date][person]={done:{},note:'',extra:0,system:0};
+  const snap = {tasks: JSON.parse(JSON.stringify(st.tasks)), logs: JSON.parse(JSON.stringify(st.logs))};
+  st.logs[date][person].system = parseFloat(val)||0;
+  st.logs[date][person].mod = Date.now();
+  logChange('Zmiana godzin w Polimanie', `${person}: ${fh(parseFloat(val)||0)}`, snap);
+  saveState();
+  renderHours();
+}
+
+let weekOffset = 0;
+
+function shiftWeek(dir) {
+  weekOffset += dir;
+  renderWeek();
+}
+
+function getWeekDates(dateStr) {
+  const d = new Date(dateStr);
+  const day = d.getDay();
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1) + weekOffset * 7);
+  return Array.from({length: 7}, (_, i) => {
+    const dd = new Date(mon);
+    dd.setDate(mon.getDate() + i);
+    return dd.toISOString().slice(0, 10);
+  });
+}
+
+function renderWeek() {
+  const date = today();
+  const weekDates = getWeekDates(date);
+  const dayNames = ['Pon','Wt','Śr','Czw','Pt','Sob','Nd'];
+  const wrap = document.getElementById('week-list-wrap');
+  const weekLabel = formatDate(weekDates[0]) + ' — ' + formatDate(weekDates[6]);
+  document.getElementById('week-range-label').textContent = weekLabel;
+
+  const cards = displaySort(PERSONS).map(person => {
+    let weekEarned = 0, weekSystem = 0, weekDriving = 0, weekDrivingReal = 0;
+    const isDriverPerson = DRIVERS.includes(person);
+    const dayRows = weekDates.map((d, i) => {
+      const pts = (st.tasks[d]||[]).filter(t=>t.person===person);
+      const pLog = ((st.logs[d]||{})[person])||{extra:0,system:0};
+      const earned = pts.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(pLog.extra)||0);
+      const system = parseFloat(pLog.system)||0;
+      weekEarned += earned;
+      const driving = parseFloat(pLog.driving)||0;
+      const drivingReal = parseFloat(pLog.drivingReal)||0;
+      weekSystem += system;
+      const diff = earned + drivingReal - system - driving;
+      const diffStr = diff > 0 ? '+'+fh(diff) : diff < 0 ? fh(diff) : '0h';
+      const diffClass = diff > 0 ? 'balance-plus' : diff < 0 ? 'balance-minus' : 'balance-zero';
+      const isToday = d === today();
+      const COMBINED_MAP_WEEK = {
+        'Kitchen + 4 Bedrooms':  {Kitchen:1, 'Ensuite Bedroom':4},
+        'Kitchen + 5 Bedrooms':  {Kitchen:1, 'Ensuite Bedroom':5},
+        'Kitchen + 6 Bedrooms':  {Kitchen:1, 'Ensuite Bedroom':6},
+        'Large Kitchen + 6 Bedrooms':  {'Large Kitchen':1, 'Ensuite Bedroom':6},
+        'Large Kitchen + 8 Bedrooms':  {'Large Kitchen':1, 'Ensuite Bedroom':8},
+        'Large Kitchen + 10 Bedrooms': {'Large Kitchen':1, 'Ensuite Bedroom':10},
+      };
+      // Agreguj zadania po typie — sumuj qty tego samego typu
+      function qtyLabel(q) {
+        if (q === 1) return '';
+        if (Number.isInteger(q)) return q + '× ';
+        const fracs = {0.25:'1/4', 0.5:'1/2', 0.75:'3/4', 1.5:'1 1/2', 2.5:'2 1/2'};
+        return (fracs[q] || q) + '× ';
+      }
+      const typeAgg = {};
+      pts.forEach(t => {
+        const isReclean = t.typeName.includes('(re-clean)');
+        const baseName = t.typeName.replace(/ 👥×\d+/,'').replace(' (re-clean)','').trim();
+        const suffix = isReclean ? ' (re-clean)' : '';
+        const mapping = COMBINED_MAP_WEEK[baseName];
+        if (mapping) {
+          Object.entries(mapping).forEach(([part, n]) => {
+            const key = part + suffix;
+            typeAgg[key] = (typeAgg[key] || 0) + n * (t.qty||1);
+          });
+        } else {
+          const key = baseName + suffix;
+          typeAgg[key] = (typeAgg[key] || 0) + (t.qty||1);
+        }
+      });
+      const taskNames = Object.entries(typeAgg).map(([name, total]) => {
+        const rounded = Math.round(total * 100) / 100;
+        return `${qtyLabel(rounded)}${name}`;
+      }).join(', ');
+      const extraNote = pLog.extra > 0 ? `+${fh(parseFloat(pLog.extra))}` : '';
+      const execLabel = taskNames ? (extraNote ? taskNames + ', ' + extraNote : taskNames) : (extraNote || '—');
+      weekDriving += driving;
+      weekDrivingReal += drivingReal;
+      return `<tr style="${isToday?'background:var(--accent-light);':''}">
+        <td style="padding:5px 6px;font-size:12px;color:var(--text2);white-space:nowrap">${dayNames[i]}</td>
+        <td style="padding:5px 6px;font-size:12px;color:var(--text3)">${execLabel}</td>
+        <td style="padding:5px 6px;font-size:12px;color:var(--text2);text-align:right;white-space:nowrap">${earned>0?fh(earned):'—'}</td>
+        ${isDriverPerson?`
+          <td style="padding:5px 6px;font-size:12px;color:#27ae60;text-align:right;white-space:nowrap">${drivingReal>0?'+'+fh(drivingReal):'—'}</td>
+          <td style="padding:5px 6px;font-size:12px;color:var(--warn);text-align:right;white-space:nowrap">${driving>0?'-'+fh(driving):'—'}</td>
+        `:''}
+        <td style="padding:5px 6px;font-size:12px;color:var(--text2);text-align:right;white-space:nowrap">${system>0?fh(system):'—'}</td>
+        <td style="padding:5px 6px;font-size:12px;text-align:right;white-space:nowrap" class="${diffClass}">${earned>0||system>0||driving>0||drivingReal>0?diffStr:'—'}</td>
+      </tr>`;
+    }).join('');
+
+    const totalDiff = weekEarned + weekDrivingReal - weekSystem - weekDriving;
+    const totalDiffStr = totalDiff > 0 ? '+'+fh(totalDiff) : totalDiff < 0 ? fh(totalDiff) : '0h';
+    const totalClass = totalDiff > 0 ? 'balance-plus' : totalDiff < 0 ? 'balance-minus' : 'balance-zero';
+
+    // Bilans ogolny (wszystkie dni) - pokazywany w prawym gornym rogu karty
+    let allEarned = 0, allSystem = 0, allDriving = 0, allDrivingReal = 0;
+    const allDays = new Set([...Object.keys(st.tasks||{}), ...Object.keys(st.logs||{})]);
+    allDays.forEach(d => {
+      const dTasks = (st.tasks[d]||[]).filter(t=>t.person===person);
+      const dLog = ((st.logs[d]||{})[person])||{extra:0,system:0,driving:0,drivingReal:0};
+      allEarned += dTasks.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(dLog.extra)||0);
+      allSystem += parseFloat(dLog.system)||0;
+      allDriving += parseFloat(dLog.driving)||0;
+      allDrivingReal += parseFloat(dLog.drivingReal)||0;
+    });
+    const overallDiff = allEarned + allDrivingReal - allSystem - allDriving;
+    const overallDiffStr = overallDiff > 0 ? '+'+fh(overallDiff) : overallDiff < 0 ? fh(overallDiff) : '0h';
+    const overallClass = overallDiff > 0 ? 'balance-plus' : overallDiff < 0 ? 'balance-minus' : 'balance-zero';
+
+    return `<div class="person-card" style="margin-bottom:10px">
+      <div class="person-top">
+        <div class="avatar">${initials(person)}</div>
+        <div class="person-name">${person}${isDriverPerson?' 🚗':''}</div>
+        <span class="${overallClass}" style="font-size:14px;font-weight:700" title="Bilans ogólny (wszystkie dni)">${overallDiffStr}</span>
+      </div>
+      <div style="padding:0 14px 10px;border-top:1px solid var(--border);overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="font-size:10px;font-weight:600;color:var(--text3);padding:6px 6px 4px;text-align:left">DZIEŃ</th>
+              <th style="font-size:10px;font-weight:600;color:var(--text3);padding:6px 6px 4px;text-align:left">WYKONANE</th>
+              <th style="font-size:10px;font-weight:600;color:var(--text3);padding:6px 6px 4px;text-align:right">PRACA</th>
+              ${isDriverPerson?`
+                <th style="font-size:10px;font-weight:600;color:#27ae60;padding:6px 6px 4px;text-align:right">FAKT.KIER.</th>
+                <th style="font-size:10px;font-weight:600;color:var(--warn);padding:6px 6px 4px;text-align:right">KIER.POL.</th>
+              `:''}
+              <th style="font-size:10px;font-weight:600;color:var(--text3);padding:6px 6px 4px;text-align:right">POLIMAN</th>
+              <th style="font-size:10px;font-weight:600;color:var(--text3);padding:6px 6px 4px;text-align:right">BILANS</th>
+            </tr>
+          </thead>
+          <tbody>${dayRows}</tbody>
+          <tfoot>
+            <tr style="border-top:1px solid var(--border)">
+              <td colspan="2" style="padding:6px 6px;font-size:13px;font-weight:500">Suma tygodnia</td>
+              <td style="padding:6px 6px;font-size:13px;color:var(--text2);text-align:right">${fh(weekEarned)}</td>
+              ${isDriverPerson?`
+                <td style="padding:6px 6px;font-size:13px;color:#27ae60;text-align:right">${weekDrivingReal>0?'+'+fh(weekDrivingReal):'—'}</td>
+                <td style="padding:6px 6px;font-size:13px;color:var(--warn);text-align:right">${weekDriving>0?'-'+fh(weekDriving):'—'}</td>
+              `:''}
+              <td style="padding:6px 6px;font-size:13px;color:var(--text2);text-align:right">${fh(weekSystem)}</td>
+              <td style="padding:6px 6px;font-size:13px;text-align:right" class="${totalClass}">${totalDiffStr}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  wrap.innerHTML = cards;
+}
+
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  // Dluzszy opis (np. usuniete zadanie) - wiecej czasu na przeczytanie
+  const dur = msg.length > 40 ? 3500 : 2000;
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+
+function logChange(action, description, snapshot) {
+  // Historia usunieta - funkcja zostawiona pusta aby nie psuc wywolan
+}
+
+function renderHistory() {
+  // Historia usunieta
+}
+
+function refresh() {
+  if (currentPage === 'assign') { initPersonSelect(); previewHours(); renderAssign(); }
+  if (currentPage === 'hours') renderHours();
+  if (currentPage === 'week') renderWeek();
+  if (currentPage === 'types') renderTypesManage();
+  if (currentPage === 'summary') renderSummary();
+}
+
+// INIT
+st.date = today();
+document.getElementById('global-date-input').value = st.date;
+updateHeader();
+initPersonSelect();
+initTypeSelect();
+renderAssign();
+
+document.querySelectorAll('.nav-btn[data-page]').forEach(btn => {
+  btn.addEventListener('click', () => switchPage(btn.dataset.page));
+});
+document.getElementById('date-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeDateModal();
+});
+document.getElementById('global-date-input').addEventListener('change', function() {
+  closeDateModal();
+});
+
+// Expose functions needed by dynamic HTML onclick attributes
+window.removeTask = removeTask;
+window.renderSummary = renderSummary;
+window.doRemoveTask = doRemoveTask;
+window.addTask = addTask;
+window.addType = addType;
+function resetTypes() {
+  st.types = JSON.parse(JSON.stringify(DEFAULT_TYPES));
+  saveState();
+  initTypeSelect();
+  renderTypesManage();
+}
+window.resetTypes = resetTypes;
+window.toggleReClean = toggleReClean;
+window.onTypeChange = onTypeChange;
+window.previewHours = previewHours;
+window.openDateModal = openDateModal;
+window.closeDateModal = closeDateModal;
+window.setExtra = setExtra;
+window.setNote = setNote;
+window.setSystem = setSystem;
+function shiftDay(dir) {
+  const d = new Date(st.date || today());
+  d.setDate(d.getDate() + dir);
+  st.date = d.toISOString().slice(0, 10);
+  document.getElementById('global-date-input').value = st.date;
+  saveState();
+  updateHeader();
+  refresh();
+}
+function sendBackup() {
+  const btn = document.getElementById('backup-now-btn');
+  const status = document.getElementById('backup-status');
+  btn.textContent = '🔄 Wysyłanie...';
+  btn.disabled = true;
+  fetch(SYNC_URL + '?action=backup')
+    .then(r => r.text())
+    .then(() => {
+      status.textContent = '✓ Backup wysłany na email!';
+      status.style.color = '#0f6e56';
+      btn.textContent = '📦 Wyślij backup teraz';
+      btn.disabled = false;
+    })
+    .catch(() => {
+      status.textContent = '⚠️ Błąd — sprawdź połączenie';
+      status.style.color = '#c0392b';
+      btn.textContent = '📦 Wyślij backup teraz';
+      btn.disabled = false;
+    });
+}
+window.sendBackup = sendBackup;
+
+document.getElementById('sync-btn').addEventListener('click', syncFromSheets);
+document.getElementById('confirm-ok-btn').addEventListener('click', doRemoveTask);
+document.getElementById('edit-save-btn').addEventListener('click', saveEditTask);
+document.getElementById('edit-cancel-btn').addEventListener('click', closeEditTask);
+document.getElementById('edit-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditTask();
+});
+document.getElementById('confirm-cancel-btn').addEventListener('click', () => {
+  pendingRemove = null;
+  document.getElementById('confirm-modal').classList.add('modal-hidden');
+});
+document.getElementById('confirm-modal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    pendingRemove = null;
+    this.classList.add('modal-hidden');
+  }
+});
+document.getElementById('hdr-week-prev').addEventListener('click', () => shiftWeek(-1));
+document.getElementById('hdr-week-next').addEventListener('click', () => shiftWeek(1));
+document.getElementById('hdr-week-label').addEventListener('click', () => { weekOffset = 0; renderWeek(); });
+
+// Auto-sync on load
+syncFromSheets(true);
+
+// Auto-sync co 15 sekund — pobiera zmiany z innych urządzeń
+setInterval(() => {
+  if (!navigator.onLine) return;
+  // Nie pobieraj jeśli są lokalne niezapisane zmiany (najpierw je wyślij)
+  if (localStorage.getItem('cleaning_pending_sync')) {
+    syncToSheets();
+    return;
+  }
+  // Nie pobieraj jeśli użytkownik właśnie coś wpisuje (focus na input)
+  const active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')) return;
+  syncFromSheets(false);
+}, 15000);
+document.getElementById('day-prev').addEventListener('click', () => shiftDay(-1));
+document.getElementById('day-next').addEventListener('click', () => shiftDay(1));
+document.getElementById('open-date-modal').addEventListener('click', openDateModal);
+document.getElementById('confirm-date').addEventListener('click', closeDateModal);
+document.getElementById('add-task-btn').addEventListener('click', addTask);
+document.getElementById('add-type-btn').addEventListener('click', addType);
+document.getElementById('backup-now-btn').addEventListener('click', sendBackup);
+document.getElementById('force-pull-btn').addEventListener('click', forcePullFromCloud);
+document.getElementById('import-backup-input').addEventListener('change', importBackup);
+
+}); // end DOMContentLoaded
+</script>
+</body>
+</html>
