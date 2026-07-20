@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v102</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v103</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -229,6 +229,12 @@ if ('serviceWorker' in navigator) {
 <div class="modal-overlay modal-hidden" id="date-modal">
   <div class="modal">
     <h3>Wybierz datę</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <button type="button" id="cal-prev" class="btn btn-secondary" style="width:42px;padding:6px 0">‹</button>
+      <span id="cal-label" style="font-weight:600;font-size:14px"></span>
+      <button type="button" id="cal-next" class="btn btn-secondary" style="width:42px;padding:6px 0">›</button>
+    </div>
+    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:14px"></div>
     <input type="date" id="global-date-input" style="margin-bottom:16px" onchange="closeDateModal()">
     <button id="confirm-date" class="btn btn-primary">Potwierdź</button>
   </div>
@@ -754,6 +760,9 @@ function fh(h) { return parseFloat(h.toFixed(2)) + 'h'; }
 
 function openDateModal() {
   document.getElementById('global-date-input').value = st.date || today();
+  const cur = new Date((st.date || today()) + 'T12:00:00');
+  calYear = cur.getFullYear(); calMonth = cur.getMonth();
+  renderCalendar();
   document.getElementById('date-modal').classList.remove('modal-hidden');
 }
 function closeDateModal() {
@@ -765,6 +774,64 @@ function closeDateModal() {
 document.getElementById('date-modal').addEventListener('click', function(e) {
   if (e.target === this) closeDateModal();
 });
+
+// ===== KALENDARZ BILANSOWY =====
+let calYear = 0, calMonth = 0;
+
+function dayBalanceFor(dateStr) {
+  const tasks = st.tasks[dateStr]||[];
+  const logs = st.logs[dateStr]||{};
+  let earned = 0, system = 0, driving = 0, drivingReal = 0;
+  tasks.forEach(t => { earned += t.h*t.qty; });
+  Object.values(logs).forEach(l => {
+    earned += parseFloat(l.extra)||0;
+    system += parseFloat(l.system)||0;
+    driving += parseFloat(l.driving)||0;
+    drivingReal += parseFloat(l.drivingReal)||0;
+  });
+  const hasData = tasks.length>0 || Object.values(logs).some(l =>
+    (parseFloat(l.system)||0) || (parseFloat(l.extra)||0) || (parseFloat(l.driving)||0) || (parseFloat(l.drivingReal)||0));
+  return {bal: earned + drivingReal - system - driving, hasData};
+}
+
+function renderCalendar() {
+  const months = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
+  document.getElementById('cal-label').textContent = months[calMonth] + ' ' + calYear;
+  const grid = document.getElementById('cal-grid');
+  const dows = ['Pn','Wt','Śr','Cz','Pt','So','Nd'];
+  let html = dows.map(d=>`<div style="text-align:center;font-size:10px;color:var(--text3);font-weight:600">${d}</div>`).join('');
+  const startDow = (new Date(calYear, calMonth, 1).getDay()+6)%7; // Pn=0
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  for (let i=0;i<startDow;i++) html += '<div></div>';
+  const todayStr = today();
+  for (let d=1; d<=daysInMonth; d++) {
+    const ds = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const {bal, hasData} = dayBalanceFor(ds);
+    let bg='var(--bg)', color='var(--text)';
+    if (hasData) {
+      // Intensywnosc koloru rosnie z wielkoscia bilansu (max przy ~10h)
+      const a = Math.min(0.85, 0.2 + Math.abs(bal)/12);
+      if (bal > 0.001) { bg = `rgba(22,163,74,${a})`; if (a>0.5) color='#fff'; }
+      else if (bal < -0.001) { bg = `rgba(220,38,38,${a})`; if (a>0.5) color='#fff'; }
+      else { bg = 'var(--accent-light)'; }
+    }
+    const isSel = ds === (st.date||todayStr);
+    const isToday = ds === todayStr;
+    const border = isSel ? '2px solid var(--accent-dark)' : (isToday ? '2px solid var(--accent-bright)' : '1px solid var(--border)');
+    const balTxt = hasData ? `<div style="font-size:8px;line-height:1.2;font-weight:500">${bal>0?'+':''}${Math.round(bal*10)/10}</div>` : '';
+    html += `<button type="button" class="cal-day" data-date="${ds}"
+      style="border:${border};border-radius:6px;background:${bg};color:${color};padding:4px 0 3px;cursor:pointer;font-family:var(--font-ui);font-size:12px;font-weight:600;min-height:32px">${d}${balTxt}</button>`;
+  }
+  grid.innerHTML = html;
+  grid.querySelectorAll('.cal-day').forEach(b => b.addEventListener('click', () => {
+    st.date = b.dataset.date;
+    saveState();
+    document.getElementById('date-modal').classList.add('modal-hidden');
+    updateHeader(); refresh();
+  }));
+}
+document.getElementById('cal-prev').addEventListener('click', () => { calMonth--; if(calMonth<0){calMonth=11;calYear--;} renderCalendar(); });
+document.getElementById('cal-next').addEventListener('click', () => { calMonth++; if(calMonth>11){calMonth=0;calYear++;} renderCalendar(); });
 
 function onDateChange(val) {
   if (!val) return;
