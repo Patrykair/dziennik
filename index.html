@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v114</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v116</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -234,8 +234,7 @@ if ('serviceWorker' in navigator) {
       <span id="cal-label" style="font-weight:600;font-size:14px"></span>
       <button type="button" id="cal-next" class="btn btn-secondary" style="width:42px;padding:6px 0">›</button>
     </div>
-    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:8px"></div>
-    <div id="cal-month-sum" style="text-align:center;font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text2)"></div>
+    <div id="cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:14px"></div>
     <input type="date" id="global-date-input" style="margin-bottom:16px" onchange="closeDateModal()">
     <button id="confirm-date" class="btn btn-primary">Potwierdź</button>
   </div>
@@ -380,11 +379,6 @@ if ('serviceWorker' in navigator) {
   <div id="summary-list-wrap"></div>
 </div>
 
-<!-- PAGE: MARZA -->
-<div class="page" id="page-margin">
-  <div id="margin-wrap"></div>
-</div>
-
 <div class="toast" id="toast"></div>
 
 <!-- BOTTOM NAV -->
@@ -405,10 +399,6 @@ if ('serviceWorker' in navigator) {
     <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     Tydzień
   </button>
-  <button class="nav-btn" id="nav-margin" data-page="margin">
-    <svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-    Marża
-  </button>
   <button class="nav-btn" id="nav-types" data-page="types">
     <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3" cy="6" r="1" fill="currentColor"/><circle cx="3" cy="12" r="1" fill="currentColor"/><circle cx="3" cy="18" r="1" fill="currentColor"/></svg>
     Normy
@@ -424,29 +414,29 @@ const PERSONS = [
 ];
 
 const DEFAULT_TYPES = [
-  {name:"Ensuite Bedroom", h:1.5, price:41},
-  {name:"Non ensuite bedroom", h:0.5, price:0},
-  {name:"Twin En-Suite", h:1.75, price:41},
-  {name:"Twin non en-suite", h:0.75, price:0},
-  {name:"Bathroom", h:1.0, price:0},
-  {name:"Corridor", h:0.5, price:0},
-  {name:"Staircase", h:1.0, price:0},
-  {name:"Śmieci", h:1.0, price:0},
-  {name:"Bedding", h:0.25, price:0},
-  {name:"Studio", h:4.0, price:105},
-  {name:"Kitchen", h:6.0, price:196},
-  {name:"Kitchen (z lodówką)", h:7.0, price:196},
-  {name:"Large Kitchen", h:8.0, price:240},
-  {name:"Kitchen + 4 Bedrooms", h:12.0, price:360},
-  {name:"Kitchen + 5 Bedrooms", h:13.5, price:401},
-  {name:"Kitchen + 6 Bedrooms", h:15.0, price:442},
-  {name:"Large Kitchen + 6 Bedrooms", h:17.0, price:486},
-  {name:"Large Kitchen + 8 Bedrooms", h:20.0, price:568},
-  {name:"Large Kitchen + 10 Bedrooms", h:23.0, price:650},
-  {name:"Sprawdzanie", h:0, custom:true, price:0},
-  {name:"Kitchen 14h", h:14.0, price:490},
-  {name:"Kitchen 12h", h:12.0, price:370},
-  {name:"Kitchen 10h", h:10.0, price:256},
+  {name:"Ensuite Bedroom", h:1.5},
+  {name:"Non ensuite bedroom", h:0.5},
+  {name:"Twin En-Suite", h:1.75},
+  {name:"Twin non en-suite", h:0.75},
+  {name:"Bathroom", h:1.0},
+  {name:"Corridor", h:0.5},
+  {name:"Staircase", h:1.0},
+  {name:"Śmieci", h:1.0},
+  {name:"Bedding", h:0.25},
+  {name:"Studio", h:4.0},
+  {name:"Kitchen", h:6.0},
+  {name:"Kitchen (z lodówką)", h:7.0},
+  {name:"Large Kitchen", h:8.0},
+  {name:"Kitchen + 4 Bedrooms", h:12.0},
+  {name:"Kitchen + 5 Bedrooms", h:13.5},
+  {name:"Kitchen + 6 Bedrooms", h:15.0},
+  {name:"Large Kitchen + 6 Bedrooms", h:17.0},
+  {name:"Large Kitchen + 8 Bedrooms", h:20.0},
+  {name:"Large Kitchen + 10 Bedrooms", h:23.0},
+  {name:"Sprawdzanie", h:0, custom:true},
+  {name:"Kitchen 14h", h:14.0},
+  {name:"Kitchen 12h", h:12.0},
+  {name:"Kitchen 10h", h:10.0},
 ];
 
 let st = loadState();
@@ -484,22 +474,10 @@ function loadState() {
       if (!existingNames.has(dt.name)) data.types.push(dt);
     });
   }
-  // Migracja: uzupelnij brakujace ceny typow z domyslnych
-  data.types.forEach(t => {
-    if (t.price === undefined) {
-      const dt = DEFAULT_TYPES.find(d => d.name === t.name);
-      t.price = dt ? (dt.price||0) : 0;
-    }
-  });
-  // Jednorazowa poprawka: stare domyslne 196 dla kuchni 14h/12h/10h -> nowe ceny
-  const PRICE_FIX = {'Kitchen 14h':[196,490],'Kitchen 12h':[196,370],'Kitchen 10h':[196,256]};
-  data.types.forEach(t => { const fx = PRICE_FIX[t.name]; if (fx && t.price === fx[0]) t.price = fx[1]; });
   // Poprawka normy: Staircase 0.25h -> 1h (o ile nie zmieniono recznie na inna)
   data.types.forEach(t => { if (t.name === 'Staircase' && t.h === 0.25) t.h = 1; });
   if (!data.tasks || typeof data.tasks !== 'object') data.tasks = {};
   if (!data.logs || typeof data.logs !== 'object') data.logs = {};
-  if (!data.revenue || typeof data.revenue !== 'object') data.revenue = {};
-  if (!data.revRates || typeof data.revRates !== 'object') data.revRates = {ens:41, kit:196, lkit:240, stu:105};
   if (!data.date) data.date = today();
   if (!data.lastModified) data.lastModified = Date.now();
   return data;
@@ -551,8 +529,6 @@ function doSyncToSheets() {
     types: st.types,
     tasks: st.tasks,
     logs: st.logs,
-    revenue: st.revenue || {},
-    revRates: st.revRates || null,
     date: st.date,
     lastModified: st.lastModified,
     deletedIds: st.deletedIds || []
@@ -598,8 +574,7 @@ function importBackup(event) {
       if (!st.types || !Array.isArray(st.types) || !st.types.length) { st.types = DEFAULT_TYPES; } else { const _en = new Set(st.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!_en.has(dt.name)) st.types.push(dt); }); }
       if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
       if (!st.logs || typeof st.logs !== 'object') st.logs = {};
-      if (!st.revenue || typeof st.revenue !== 'object') st.revenue = {};
-      st.date = today();
+          st.date = today();
       st.lastModified = Date.now();
       localStorage.setItem('cleaning_v4', JSON.stringify(st));
       localStorage.removeItem('cleaning_pending_sync');
@@ -626,8 +601,7 @@ function forcePullFromCloud(silent) {
         if (!st.types || !Array.isArray(st.types) || !st.types.length) { st.types = DEFAULT_TYPES; } else { const _en = new Set(st.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!_en.has(dt.name)) st.types.push(dt); }); }
         if (!st.tasks || typeof st.tasks !== 'object') st.tasks = {};
         if (!st.logs || typeof st.logs !== 'object') st.logs = {};
-        if (!st.revenue || typeof st.revenue !== 'object') st.revenue = {};
-        st.date = today();
+              st.date = today();
         st.lastModified = Date.now(); // ustaw nowy timestamp by ten stan byl "wiodacy"
         localStorage.setItem('cleaning_v4', JSON.stringify(st));
         localStorage.removeItem('cleaning_pending_sync');
@@ -648,19 +622,9 @@ window.forcePullFromCloud = forcePullFromCloud;
 function ensureFields(s) {
   if (!s.types || !Array.isArray(s.types) || !s.types.length) { s.types = DEFAULT_TYPES; }
   else { const en = new Set(s.types.map(t=>t.name)); DEFAULT_TYPES.forEach(dt=>{ if(!en.has(dt.name)) s.types.push(dt); }); }
-  s.types.forEach(t => {
-    if (t.price === undefined) {
-      const dt = DEFAULT_TYPES.find(d => d.name === t.name);
-      t.price = dt ? (dt.price||0) : 0;
-    }
-  });
-  const PRICE_FIX2 = {'Kitchen 14h':[196,490],'Kitchen 12h':[196,370],'Kitchen 10h':[196,256]};
-  s.types.forEach(t => { const fx = PRICE_FIX2[t.name]; if (fx && t.price === fx[0]) t.price = fx[1]; });
   s.types.forEach(t => { if (t.name === 'Staircase' && t.h === 0.25) t.h = 1; });
   if (!s.tasks || typeof s.tasks !== 'object') s.tasks = {};
   if (!s.logs || typeof s.logs !== 'object') s.logs = {};
-  if (!s.revenue || typeof s.revenue !== 'object') s.revenue = {};
-  if (!s.revRates || typeof s.revRates !== 'object') s.revRates = {ens:41, kit:196, lkit:240, stu:105};
   return s;
 }
 
@@ -726,18 +690,6 @@ function mergeStates(local, cloud) {
       }
     });
   });
-  // Scal przychody - dla kazdego dnia nowszy wpis (mod) wygrywa, remis = lokalny
-  merged.revenue = {};
-  const allRevDays = new Set([...Object.keys(local.revenue||{}), ...Object.keys(cloud.revenue||{})]);
-  allRevDays.forEach(day => {
-    const lr = (local.revenue||{})[day], cr = (cloud.revenue||{})[day];
-    if (lr && cr) merged.revenue[day] = ((lr.mod||0) >= (cr.mod||0)) ? lr : cr;
-    else merged.revenue[day] = lr || cr;
-  });
-  // Scal ceny przychodu - nowszy zestaw (mod) wygrywa
-  const lR = local.revRates, cR = cloud.revRates;
-  if (lR && cR) merged.revRates = ((lR.mod||0) >= (cR.mod||0)) ? lR : cR;
-  else merged.revRates = lR || cR || null;
   return ensureFields(merged);
 }
 
@@ -855,11 +807,9 @@ function renderCalendar() {
   const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
   for (let i=0;i<startDow;i++) html += '<div></div>';
   const todayStr = today();
-  let monthBal = 0, monthHasData = false;
   for (let d=1; d<=daysInMonth; d++) {
     const ds = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
     const {bal, hasData} = dayBalanceFor(ds);
-    if (hasData) { monthBal += bal; monthHasData = true; }
     let bg='var(--bg)', color='var(--text)';
     if (hasData) {
       // Intensywnosc koloru rosnie z wielkoscia bilansu (max przy ~10h)
@@ -876,15 +826,6 @@ function renderCalendar() {
       style="border:${border};border-radius:6px;background:${bg};color:${color};padding:4px 0 3px;cursor:pointer;font-family:var(--font-ui);font-size:12px;font-weight:600;min-height:32px">${d}${balTxt}</button>`;
   }
   grid.innerHTML = html;
-  // Znacznik sumy calego miesiaca
-  const sumEl = document.getElementById('cal-month-sum');
-  if (monthHasData) {
-    const s = monthBal > 0.001 ? '+'+fh(monthBal) : monthBal < -0.001 ? fh(monthBal) : '0h';
-    const cls = monthBal > 0.001 ? 'balance-plus' : monthBal < -0.001 ? 'balance-minus' : 'balance-zero';
-    sumEl.innerHTML = `Bilans miesiąca: <span class="${cls}">${s}</span>`;
-  } else {
-    sumEl.innerHTML = '';
-  }
   grid.querySelectorAll('.cal-day').forEach(b => b.addEventListener('click', () => {
     st.date = b.dataset.date;
     saveState();
@@ -1404,7 +1345,7 @@ function addType() {
   const name = document.getElementById('nt-name').value.trim();
   const h = parseFloat(document.getElementById('nt-h').value);
   if (!name || !h) return;
-  st.types.push({name, h, price: 0});
+  st.types.push({name, h});
   document.getElementById('nt-name').value='';
   document.getElementById('nt-h').value='';
   saveState(); initTypeSelect(); renderTypesManage();
@@ -1458,21 +1399,9 @@ function renderTypesManage() {
     <div class="type-row">
       <span class="type-name">${t.name}</span>
       <span class="type-h">${t.h}h</span>
-      <input type="number" min="0" step="0.5" inputmode="decimal" value="${t.price||0}"
-        onchange="setTypePrice(${i}, this.value)" title="Cena (£)"
-        style="width:72px;padding:6px 8px;font-size:13px;text-align:right">
-      <span style="font-size:11px;color:var(--text3)">£</span>
       <button class="btn-danger-sm" onclick="removeType(${i})">Usuń</button>
     </div>`).join('');
 }
-
-function setTypePrice(i, val) {
-  if (!st.types[i]) return;
-  st.types[i].price = parseFloat(val)||0;
-  saveState();
-  showToast('✓ Cena zapisana');
-}
-window.setTypePrice = setTypePrice;
 
 function escQ(s) { return s.replace(/'/g,"\\'"); }
 
@@ -1976,166 +1905,7 @@ function renderHistory() {
   // Historia usunieta
 }
 
-function renderMargin() {
-  const wrap = document.getElementById('margin-wrap');
-  const allDays = [...new Set([...Object.keys(st.tasks||{}), ...Object.keys(st.logs||{})])].sort();
 
-  // Bilans: ogolny zespolu, per osoba, per miesiac (pelna formula z kierowaniem)
-  let teamBal = 0;
-  const personBal = {};
-  const monthBal = {};
-  allDays.forEach(d => {
-    const tasks = st.tasks[d]||[];
-    const logs = st.logs[d]||{};
-    const month = d.slice(0,7);
-    const persons = new Set([...tasks.map(t=>t.person), ...Object.keys(logs)]);
-    persons.forEach(p => {
-      const pTasks = tasks.filter(t=>t.person===p);
-      const l = logs[p]||{};
-      const bal = pTasks.reduce((s,t)=>s+t.h*t.qty,0) + (parseFloat(l.extra)||0)
-        + (parseFloat(l.drivingReal)||0) - (parseFloat(l.system)||0) - (parseFloat(l.driving)||0);
-      teamBal += bal;
-      personBal[p] = (personBal[p]||0) + bal;
-      monthBal[month] = (monthBal[month]||0) + bal;
-    });
-  });
-
-  const balSpan = v => {
-    const s = v > 0.001 ? '+'+fh(v) : v < -0.001 ? fh(v) : '0h';
-    const c = v > 0.001 ? 'balance-plus' : v < -0.001 ? 'balance-minus' : 'balance-zero';
-    return `<span class="${c}">${s}</span>`;
-  };
-
-  const MONTHS_PL = ['Styczeń','Luty','Marzec','Kwiecień','Maj','Czerwiec','Lipiec','Sierpień','Wrzesień','Październik','Listopad','Grudzień'];
-  const monthRows = Object.keys(monthBal).sort().reverse().map(m => {
-    const [y,mm] = m.split('-');
-    return `<div class="sum-row"><span>${MONTHS_PL[parseInt(mm)-1]} ${y}</span>${balSpan(monthBal[m])}</div>`;
-  }).join('');
-
-  // KOSZTY PRACY (wg godzin wpisanych w Polimanie)
-  // Stawki: Natalia 13,25 €/h; pozostali 12,71 €/h; moje godziny 16 €/h
-  const RATE_NATALIA = 13.25, RATE_OTHERS = 12.71, RATE_ME = 16;
-  const rateFor = p => p === 'Natalia Laszewska' ? RATE_NATALIA : RATE_OTHERS;
-  const fmtEur = v => (Math.round(v*100)/100).toFixed(2).replace('.', ',') + ' €';
-  let totalWorkerCost = 0, totalMyCost = 0, totalMyHours = 0, totalWorkerHours = 0;
-  const monthCost = {};
-  allDays.forEach(d => {
-    const logs = st.logs[d]||{};
-    const month = d.slice(0,7);
-    let dayCost = 0, maxSys = 0, anySys = false;
-    Object.entries(logs).forEach(([p,l]) => {
-      const sys = parseFloat(l.system)||0;
-      if (sys > 0) {
-        anySys = true;
-        dayCost += sys * rateFor(p);
-        totalWorkerHours += sys;
-        if (sys > maxSys) maxSys = sys;
-      }
-    });
-    if (anySys) {
-      // Moje godziny tego dnia = najwyzszy wpis Poliman + 1h, stawka 16 €/h
-      const myH = maxSys + 1;
-      const myCost = myH * RATE_ME;
-      totalMyHours += myH;
-      totalMyCost += myCost;
-      totalWorkerCost += dayCost;
-      monthCost[month] = (monthCost[month]||0) + dayCost + myCost;
-    }
-  });
-  const totalCost = totalWorkerCost + totalMyCost;
-  const costMonthRows = Object.keys(monthCost).sort().reverse().map(m => {
-    const [y,mm] = m.split('-');
-    return `<div class="sum-row"><span>${MONTHS_PL[parseInt(mm)-1]} ${y}</span><span style="font-weight:600">${fmtEur(monthCost[m])}</span></div>`;
-  }).join('');
-
-  // PRZYCHÓD — automatycznie z zadan, wg CEN TYPOW (Normy), tygodniowo
-  const priceOf = {};
-  (st.types||[]).forEach(t => { priceOf[t.name] = parseFloat(t.price)||0; });
-  const fmtGbp = v => (Math.round(v*100)/100).toFixed(2).replace('.', ',') + ' £';
-  const rnd = v => Math.round(v*100)/100;
-  const revByWeek = {}; // wk -> {total, byType: {nazwa: {qty, sum, price}}}
-  Object.keys(st.tasks||{}).forEach(d => {
-    const wk = weekStartOf(d);
-    (st.tasks[d]||[]).forEach(t => {
-      const isReclean = t.typeName.includes('(re-clean)');
-      const base = t.typeName.replace(/ 👥×\d+/,'').replace(' (re-clean)','').trim();
-      const price = priceOf[base]||0;
-      if (!price) return; // typy bez ceny nie licza sie do przychodu
-      // Re-clean rozliczany jako POLOWA stawki
-      const q = (t.qty||0) * (isReclean ? 0.5 : 1);
-      const s = q * price;
-      if (!revByWeek[wk]) revByWeek[wk] = {total:0, byType:{}};
-      revByWeek[wk].total += s;
-      if (!revByWeek[wk].byType[base]) revByWeek[wk].byType[base] = {qty:0, sum:0, price};
-      revByWeek[wk].byType[base].qty += q;
-      revByWeek[wk].byType[base].sum += s;
-    });
-  });
-  const selDate = st.date || today();
-  const wkStart = weekStartOf(selDate);
-  const wkEnd = addDaysStr(wkStart, 6);
-  const wkLabel = wkStart.slice(8,10)+'.'+wkStart.slice(5,7)+' – '+wkEnd.slice(8,10)+'.'+wkEnd.slice(5,7);
-  const weekData = revByWeek[wkStart] || {total:0, byType:{}};
-  const weekTypeRows = Object.entries(weekData.byType)
-    .sort((a,b)=>b[1].sum-a[1].sum)
-    .map(([name,v])=>`<div class="sum-row"><span>${name} × ${rnd(v.qty)} (${v.price} £)</span><span style="font-weight:600">${fmtGbp(v.sum)}</span></div>`)
-    .join('') || '<div style="font-size:12px;color:var(--text3);padding:6px 0">Brak zadań z cenami w tym tygodniu</div>';
-  let totalRev = 0; const monthRev = {};
-  const revWeekRows = Object.keys(revByWeek).sort().reverse().map(wk => {
-    const v = revByWeek[wk].total;
-    if (v <= 0) return '';
-    totalRev += v;
-    const mo = wk.slice(0,7);
-    monthRev[mo] = (monthRev[mo]||0) + v;
-    const we = addDaysStr(wk, 6);
-    const lbl = wk.slice(8,10)+'.'+wk.slice(5,7)+' – '+we.slice(8,10)+'.'+we.slice(5,7)+'.'+we.slice(0,4);
-    return `<div class="sum-row"><span>${lbl}</span><span style="font-weight:600">${fmtGbp(v)}</span></div>`;
-  }).join('') || '<div style="font-size:12px;color:var(--text3);padding:6px 0">Brak zadań</div>';
-  const revMonthRows = Object.keys(monthRev).sort().reverse().map(m => {
-    const [y,mm] = m.split('-');
-    return `<div class="sum-row"><span>${MONTHS_PL[parseInt(mm)-1]} ${y}</span><span style="font-weight:600">${fmtGbp(monthRev[m])}</span></div>`;
-  }).join('') || '<div style="font-size:12px;color:var(--text3);padding:6px 0">Brak wpisów</div>';
-
-  wrap.innerHTML = `
-    <div class="section-label" style="margin-top:0">Przychód — tydzień ${wkLabel} (auto z zadań)</div>
-    <div class="card"><div class="card-body">
-      ${weekTypeRows}
-      <div class="sum-row sum-total"><span>Przychód tygodnia</span><span>${fmtGbp(weekData.total)}</span></div>
-      <p style="font-size:10px;color:var(--text3);margin-top:8px">Ceny ustawiasz w Normach przy każdym typie · re-clean = połowa stawki · typy z ceną 0 nie liczą się do przychodu</p>
-    </div></div>
-    <div class="section-label">Przychód po tygodniach</div>
-    <div class="card"><div class="card-body">${revWeekRows}</div></div>
-    <div class="section-label">Przychód po miesiącach</div>
-    <div class="card"><div class="card-body">
-      ${revMonthRows}
-      <div class="sum-row sum-total"><span>Razem przychód</span><span>${fmtGbp(totalRev)}</span></div>
-    </div></div>
-    <div class="section-label">Bilans po miesiącach</div>
-    <div class="card"><div class="card-body">${monthRows}</div></div>
-    <div class="section-label">Koszty pracy (wg Polimana)</div>
-    <div class="card"><div class="card-body">
-      <div class="sum-row"><span>Pracownicy (${fh(totalWorkerHours)})</span><span style="font-weight:600">${fmtEur(totalWorkerCost)}</span></div>
-      <div class="sum-row"><span>Moje godziny (${fh(totalMyHours)} × 16 €)</span><span style="font-weight:600">${fmtEur(totalMyCost)}</span></div>
-      <div class="sum-row sum-total"><span>Razem koszt</span><span>${fmtEur(totalCost)}</span></div>
-      <p style="font-size:10px;color:var(--text3);margin-top:8px">Stawki: Natalia 13,25 €/h · pozostali 12,71 €/h · moje = najwyższy wpis dnia + 1h po 16 €/h</p>
-    </div></div>
-    <div class="section-label">Koszty po miesiącach</div>
-    <div class="card"><div class="card-body">${costMonthRows}</div></div>`;
-}
-
-// Poczatek tygodnia (poniedzialek) - NIEZALEZNE od weekOffset zakladki Tydzien
-function weekStartOf(dateStr) {
-  const d = new Date(dateStr + 'T12:00:00');
-  const day = d.getDay();
-  const mon = new Date(d);
-  mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  return mon.toISOString().slice(0,10);
-}
-function addDaysStr(dateStr, n) {
-  const d = new Date(dateStr + 'T12:00:00');
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0,10);
-}
 
 
 
@@ -2147,7 +1917,6 @@ function refresh() {
   if (currentPage === 'week') renderWeek();
   if (currentPage === 'types') renderTypesManage();
   if (currentPage === 'summary') renderSummary();
-  if (currentPage === 'margin') renderMargin();
 }
 
 // INIT
