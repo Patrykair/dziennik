@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v121</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v122</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -409,9 +409,7 @@ if ('serviceWorker' in navigator) {
 window.addEventListener('DOMContentLoaded', function() {
 const PERSONS = [
   "Maciej Skrouba","Natalia Laszewska","Aleksandra Wysocka","Bartosz Wolner","Wiktoria Wojciechowska",
-  "Ewa Hejmo","Ive Massani","Krystian Markiewicz","Piotr Czaja",
-  "Anna Jamiołkowska","Iwona Kuś","Gabriela Wystalska","Kamil Garbowski",
-  "Patrycja Kostro","Patryk Kościelny"
+  "Ewa Hejmo","Ive Massani","Krystian Markiewicz","Piotr Czaja"
 ];
 
 const DEFAULT_TYPES = [
@@ -1594,8 +1592,6 @@ const DRIVERS = ['Maciej Skrouba','Piotr Czaja','Natalia Laszewska'];
 const DISPLAY_ORDER = [
   'Maciej Skrouba','Natalia Laszewska','Krystian Markiewicz','Piotr Czaja',
   'Aleksandra Wysocka','Bartosz Wolner','Ewa Hejmo','Ive Massani','Wiktoria Wojciechowska',
-  'Anna Jamiołkowska','Iwona Kuś','Gabriela Wystalska','Kamil Garbowski',
-  'Patrycja Kostro','Patryk Kościelny'
 ];
 function displaySort(list) {
   return [...list].sort((a,b)=>{
