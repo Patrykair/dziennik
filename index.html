@@ -196,7 +196,7 @@ if ('serviceWorker' in navigator) {
 
 <div class="header" style="flex-direction:column;gap:6px;padding:12px 16px">
   <div style="display:flex;align-items:center;justify-content:space-between;width:100%">
-    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v122</span></div>
+    <div class="header-title">Dziennik <span style="font-size:11px;font-weight:400;opacity:.6">v123</span></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="sync-btn" class="date-btn" style="font-size:12px;padding:5px 10px" title="Pobierz dane z chmury">☁️ Sync</button>
       <button id="day-prev" class="date-btn" style="padding:6px 10px;font-size:16px">‹</button>
@@ -785,17 +785,16 @@ let calYear = 0, calMonth = 0;
 function dayBalanceFor(dateStr) {
   const tasks = st.tasks[dateStr]||[];
   const logs = st.logs[dateStr]||{};
-  let earned = 0, system = 0, driving = 0, drivingReal = 0;
+  // Bilans BEZ godzin kierowania: praca (zadania + dodatkowe) minus Poliman
+  let earned = 0, system = 0;
   tasks.forEach(t => { earned += t.h*t.qty; });
   Object.values(logs).forEach(l => {
     earned += parseFloat(l.extra)||0;
     system += parseFloat(l.system)||0;
-    driving += parseFloat(l.driving)||0;
-    drivingReal += parseFloat(l.drivingReal)||0;
   });
   const hasData = tasks.length>0 || Object.values(logs).some(l =>
-    (parseFloat(l.system)||0) || (parseFloat(l.extra)||0) || (parseFloat(l.driving)||0) || (parseFloat(l.drivingReal)||0));
-  return {bal: earned + drivingReal - system - driving, hasData};
+    (parseFloat(l.system)||0) || (parseFloat(l.extra)||0));
+  return {bal: earned - system, hasData};
 }
 
 function renderCalendar() {
